@@ -2,6 +2,14 @@
 
 vLLM server management tool for CMW projects. Provides easy setup, model downloading, and server management for vLLM inference servers.
 
+## AI-Enabled Repo
+
+Chat with DeepWiki to get answers about this repo:
+
+[Ask DeepWiki](https://deepwiki.com/arterm-sedov/cmw-vllm)
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/arterm-sedov/cmw-vllm)
+
 ## Features
 
 - **Easy Setup**: One-command installation and verification
@@ -175,11 +183,3 @@ cmw-vllm/
 ├── docs/                  # Documentation
 └── config/                # Configuration templates
 ```
-
-## License
-
-[Add your license here]
-
-## Contributing
-
-[Add contributing guidelines here]
