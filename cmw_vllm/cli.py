@@ -111,6 +111,7 @@ def download(model_id: str, local_dir: Path | None, no_resume: bool, skip_space_
 @click.option("--host", help="Server host")
 @click.option("--max-model-len", type=int, help="Maximum model length")
 @click.option("--gpu-memory-utilization", type=float, help="GPU memory utilization (0.0-1.0)")
+@click.option("--cpu-offload-gb", type=int, help="CPU offload memory in GB (for large models on limited GPU memory)")
 @click.option("--foreground", "-f", is_flag=True, help="Run in foreground (don't detach)")
 def start(
     model: str | None,
@@ -118,6 +119,7 @@ def start(
     host: str | None,
     max_model_len: int | None,
     gpu_memory_utilization: float | None,
+    cpu_offload_gb: int | None,
     foreground: bool,
 ) -> None:
     """Start vLLM server."""
@@ -135,6 +137,8 @@ def start(
         config.max_model_len = max_model_len
     if gpu_memory_utilization is not None:
         config.gpu_memory_utilization = gpu_memory_utilization
+    if cpu_offload_gb is not None:
+        config.cpu_offload_gb = cpu_offload_gb
 
     click.echo(f"Starting vLLM server with model: {config.model}")
     click.echo(f"Server will be available at: http://{config.host}:{config.port}")
@@ -235,7 +239,7 @@ def list(show_all: bool) -> None:
 
 @cli.command()
 @click.option("--base-url", default="http://localhost:8000", help="Server base URL")
-@click.option("--test-inference", is_flag=True, help="Test inference with a simple request")
+@click.option("--test-inference", "test_inference_flag", is_flag=True, help="Test inference with a simple request")
 def status(base_url: str, test_inference_flag: bool) -> None:
     """Check vLLM server status."""
     click.echo(f"Checking server status at {base_url}...")

@@ -93,10 +93,16 @@ Configuration is done via environment variables. Create a `.env` file:
 VLLM_MODEL=Qwen/Qwen3-30B-A3B-Instruct-2507
 VLLM_PORT=8000
 VLLM_HOST=0.0.0.0
-VLLM_MAX_MODEL_LEN=262144
-VLLM_GPU_MEMORY_UTILIZATION=0.9
+VLLM_MAX_MODEL_LEN=40000
+VLLM_GPU_MEMORY_UTILIZATION=0.8
+VLLM_CPU_OFFLOAD_GB=24
 VLLM_TENSOR_PARALLEL_SIZE=1
 ```
+
+**Note:** Default configuration is optimized for 48GB GPUs (RTX 4090, A6000, etc.):
+- `max_model_len=40000`: Reduced from 262144 to fit KV cache in available GPU memory
+- `gpu_memory_utilization=0.8`: Leaves headroom for other processes
+- `cpu_offload_gb=24`: Offloads model weights to CPU RAM for large models
 
 See `.env.example` for all available options.
 
@@ -120,8 +126,9 @@ Start vLLM server.
 - `--model MODEL`: Model identifier
 - `--port PORT`: Server port (default: 8000)
 - `--host HOST`: Server host (default: 0.0.0.0)
-- `--max-model-len LEN`: Maximum model length
-- `--gpu-memory-utilization FLOAT`: GPU memory utilization (0.0-1.0)
+- `--max-model-len LEN`: Maximum model length (default: 40000 for 48GB GPUs)
+- `--gpu-memory-utilization FLOAT`: GPU memory utilization (0.0-1.0, default: 0.8)
+- `--cpu-offload-gb INT`: CPU offload memory in GB (default: 24 for large models)
 - `--foreground, -f`: Run in foreground (don't detach)
 
 ### `cmw-vllm stop`

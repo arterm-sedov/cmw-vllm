@@ -87,11 +87,23 @@ cmw-vllm download --local-dir /path/to/models
 
 ### GPU Memory Configuration
 
-Adjust GPU memory utilization:
+Adjust GPU memory utilization and CPU offloading:
 
 ```bash
+# Adjust GPU memory utilization
 cmw-vllm start --gpu-memory-utilization 0.8
+
+# Enable CPU offloading for large models (default: 24GB)
+cmw-vllm start --cpu-offload-gb 24
+
+# Adjust max model length to reduce KV cache requirements
+cmw-vllm start --max-model-len 40000
 ```
+
+**Note for 48GB GPUs (RTX 4090, A6000, etc.):**
+- Default configuration uses `--max-model-len 40000` and `--cpu-offload-gb 24` to fit large models
+- The full 262K context window requires more GPU memory than available
+- Adjust `--max-model-len` based on your GPU memory and KV cache requirements
 
 ## Environment Configuration
 
@@ -101,9 +113,15 @@ Create `.env` file for persistent configuration:
 VLLM_MODEL=Qwen/Qwen3-30B-A3B-Instruct-2507
 VLLM_PORT=8000
 VLLM_HOST=0.0.0.0
-VLLM_MAX_MODEL_LEN=262144
-VLLM_GPU_MEMORY_UTILIZATION=0.9
+VLLM_MAX_MODEL_LEN=40000
+VLLM_GPU_MEMORY_UTILIZATION=0.8
+VLLM_CPU_OFFLOAD_GB=24
 ```
+
+**Default Configuration (optimized for 48GB GPUs):**
+- `VLLM_MAX_MODEL_LEN=40000`: Reduced from 262144 to fit KV cache in GPU memory
+- `VLLM_GPU_MEMORY_UTILIZATION=0.8`: Leaves headroom for other processes
+- `VLLM_CPU_OFFLOAD_GB=24`: Offloads model weights to CPU RAM for large models
 
 ## Integration Examples
 

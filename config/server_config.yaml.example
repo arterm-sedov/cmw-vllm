@@ -1,10 +1,12 @@
 # Example vLLM server configuration
 # Copy this file and customize as needed
+# Default values are optimized for 48GB GPUs (RTX 4090, A6000, etc.)
 
 model: Qwen/Qwen3-30B-A3B-Instruct-2507
 host: 0.0.0.0
 port: 8000
-max_model_len: 262144
-gpu_memory_utilization: 0.9
+max_model_len: 40000  # Reduced from 262144 to fit KV cache in GPU memory
+gpu_memory_utilization: 0.8  # Leaves headroom for other processes
+cpu_offload_gb: 24  # Offloads model weights to CPU RAM for large models
 tensor_parallel_size: 1
 trust_remote_code: false
