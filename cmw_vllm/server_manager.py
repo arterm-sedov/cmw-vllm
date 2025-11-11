@@ -4,8 +4,10 @@ from __future__ import annotations
 import logging
 import os
 import signal
+import socket
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -73,16 +75,80 @@ class VLLMServerManager:
                 subprocess.run(cmd, check=True)
                 return True
 
-            # Wait a bit to check if process is still alive
-            time.sleep(2)
-            if self.process.poll() is not None:
-                # Process died
-                stderr = self.process.stderr.read().decode() if self.process.stderr else ""
-                logger.error(f"Server process exited immediately. Error: {stderr}")
+            # Capture stderr in background to see errors
+            stderr_lines = []
+            stdout_lines = []
+            
+            def capture_output(pipe, lines_list):
+                try:
+                    for line in iter(pipe.readline, b''):
+                        if line:
+                            lines_list.append(line.decode('utf-8', errors='replace').strip())
+                except Exception:
+                    pass
+            
+            if self.process.stderr:
+                stderr_thread = threading.Thread(
+                    target=capture_output,
+                    args=(self.process.stderr, stderr_lines),
+                    daemon=True
+                )
+                stderr_thread.start()
+            
+            if self.process.stdout:
+                stdout_thread = threading.Thread(
+                    target=capture_output,
+                    args=(self.process.stdout, stdout_lines),
+                    daemon=True
+                )
+                stdout_thread.start()
+            
+            # Wait and check if process is still alive, and if port is listening
+            max_wait = 30  # Wait up to 30 seconds
+            check_interval = 1  # Check every second
+            waited = 0
+            
+            while waited < max_wait:
+                time.sleep(check_interval)
+                waited += check_interval
+                
+                # Check if process died
+                if self.process.poll() is not None:
+                    # Process died - get error output
+                    time.sleep(0.5)  # Give threads time to capture output
+                    error_output = '\n'.join(stderr_lines[-20:] + stdout_lines[-20:])  # Last 20 lines of each
+                    if error_output:
+                        logger.error(f"Server process exited. Last output:\n{error_output}")
+                    else:
+                        logger.error("Server process exited immediately with no output")
+                    self._cleanup_pid()
+                    return False
+                
+                # Check if port is listening
+                if self._is_port_listening():
+                    logger.info(f"Server started successfully on {self.config.host}:{self.config.port}")
+                    return True
+                
+                # Log progress for long waits
+                if waited % 5 == 0:
+                    logger.info(f"Waiting for server to start... ({waited}s)")
+            
+            # Timeout - check if process is still alive
+            if self.process.poll() is None:
+                # Process is alive but port not listening - might still be loading
+                logger.warning(f"Server process is running but port {self.config.port} not yet listening after {max_wait}s")
+                logger.warning("Server may still be loading the model. Check status with 'cmw-vllm list'")
+                return True  # Consider it started if process is alive
+            else:
+                # Process died during wait
+                time.sleep(0.5)
+                error_output = '\n'.join(stderr_lines[-20:] + stdout_lines[-20:])
+                if error_output:
+                    logger.error(f"Server process exited. Last output:\n{error_output}")
+                else:
+                    logger.error("Server process exited with no output")
+                self._cleanup_pid()
                 return False
-
-            logger.info(f"Server started successfully on {self.config.host}:{self.config.port}")
-            return True
 
         except Exception as e:
             logger.error(f"Failed to start server: {e}")
@@ -146,7 +212,19 @@ class VLLMServerManager:
 
         try:
             process = psutil.Process(pid)
-            return process.is_running()
+            # Check if process is actually running and is a vLLM server
+            if not process.is_running():
+                self._cleanup_pid()
+                return False
+            
+            # Verify it's actually a vLLM server process
+            cmdline_str = ' '.join(process.cmdline())
+            if 'vllm' not in cmdline_str.lower() and 'api_server' not in cmdline_str.lower():
+                # PID exists but it's not our vLLM server
+                self._cleanup_pid()
+                return False
+                
+            return True
         except psutil.NoSuchProcess:
             self._cleanup_pid()
             return False
@@ -175,3 +253,75 @@ class VLLMServerManager:
                 self.pid_file.unlink()
             except OSError:
                 pass
+        self.process = None
+
+    def get_server_info(self) -> dict | None:
+        """Get information about the running server.
+
+        Returns:
+            Dictionary with server info or None if not running
+        """
+        pid = self._get_pid()
+        if not pid:
+            return None
+
+        try:
+            process = psutil.Process(pid)
+            if not process.is_running():
+                self._cleanup_pid()
+                return None
+
+            cmdline = ' '.join(process.cmdline())
+            if 'vllm' not in cmdline.lower() and 'api_server' not in cmdline.lower():
+                self._cleanup_pid()
+                return None
+
+            return {
+                "pid": pid,
+                "cmdline": cmdline,
+                "status": process.status(),
+                "memory_mb": process.memory_info().rss / 1024 / 1024,
+                "cpu_percent": process.cpu_percent(interval=0.1),
+                "create_time": process.create_time(),
+            }
+        except psutil.NoSuchProcess:
+            self._cleanup_pid()
+            return None
+
+    def _is_port_listening(self) -> bool:
+        """Check if the server port is listening.
+        
+        Returns:
+            True if port is listening
+        """
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex((self.config.host if self.config.host != '0.0.0.0' else 'localhost', self.config.port))
+            sock.close()
+            return result == 0
+        except Exception:
+            return False
+
+    @staticmethod
+    def find_all_servers() -> list[dict]:
+        """Find all running vLLM server processes.
+
+        Returns:
+            List of dictionaries with server information
+        """
+        servers = []
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'status', 'memory_info', 'create_time']):
+            try:
+                cmdline = ' '.join(proc.info['cmdline'] or [])
+                if 'vllm.entrypoints.openai.api_server' in cmdline or 'api_server' in cmdline:
+                    servers.append({
+                        "pid": proc.info['pid'],
+                        "cmdline": cmdline,
+                        "status": proc.info['status'],
+                        "memory_mb": proc.info['memory_info'].rss / 1024 / 1024 if proc.info['memory_info'] else 0,
+                        "create_time": proc.info['create_time'],
+                    })
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        return servers

@@ -140,6 +140,17 @@ def start(
     click.echo(f"Server will be available at: http://{config.host}:{config.port}")
 
     manager = VLLMServerManager(config)
+    
+    # Check if server is already running
+    if manager.is_running():
+        server_info = manager.get_server_info()
+        if server_info:
+            click.echo(f"⚠ Server is already running (PID: {server_info['pid']})")
+            click.echo("  Use 'cmw-vllm stop' to stop it first, or 'cmw-vllm list' to see details")
+        else:
+            click.echo("⚠ Server appears to be running but could not get details")
+        sys.exit(1)
+    
     success = manager.start(background=not foreground)
 
     if success:
@@ -148,6 +159,7 @@ def start(
             click.echo(f"  Running in background. Use 'cmw-vllm stop' to stop it.")
     else:
         click.echo("✗ Failed to start server", err=True)
+        click.echo("  Check the logs above for error details")
         sys.exit(1)
 
 
@@ -179,6 +191,46 @@ def restart() -> None:
     else:
         click.echo("✗ Failed to restart server", err=True)
         sys.exit(1)
+
+
+@cli.command()
+@click.option("--all", "-a", "show_all", is_flag=True, help="Show all vLLM servers (not just managed one)")
+def list(show_all: bool) -> None:
+    """List running vLLM servers."""
+    if show_all:
+        servers = VLLMServerManager.find_all_servers()
+        if not servers:
+            click.echo("No vLLM servers are running")
+            return
+
+        click.echo(f"Found {len(servers)} running vLLM server(s):")
+        click.echo("=" * 80)
+        for i, server in enumerate(servers, 1):
+            click.echo(f"\nServer {i}:")
+            click.echo(f"  PID: {server['pid']}")
+            click.echo(f"  Status: {server['status']}")
+            click.echo(f"  Memory: {server['memory_mb']:.1f} MB")
+            click.echo(f"  Command: {server['cmdline'][:100]}...")
+    else:
+        manager = VLLMServerManager()
+        server_info = manager.get_server_info()
+        
+        if server_info:
+            click.echo("Managed vLLM server is running:")
+            click.echo("=" * 80)
+            click.echo(f"  PID: {server_info['pid']}")
+            click.echo(f"  Status: {server_info['status']}")
+            click.echo(f"  Memory: {server_info['memory_mb']:.1f} MB")
+            click.echo(f"  CPU: {server_info['cpu_percent']:.1f}%")
+            click.echo(f"  Command: {server_info['cmdline'][:100]}...")
+        else:
+            click.echo("No managed vLLM server is running")
+            
+            # Check for any vLLM servers
+            all_servers = VLLMServerManager.find_all_servers()
+            if all_servers:
+                click.echo(f"\n⚠ Found {len(all_servers)} unmanaged vLLM server(s) running")
+                click.echo("  Use 'cmw-vllm list --all' to see them")
 
 
 @cli.command()
