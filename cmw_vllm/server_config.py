@@ -6,11 +6,13 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from cmw_vllm.model_registry import get_model_info
+
 
 class ServerConfig(BaseModel):
     """vLLM server configuration."""
 
-    model: str = Field(default="Qwen/Qwen3-30B-A3B-Instruct-2507", description="Model identifier")
+    model: str = Field(default="openai/gpt-oss-20b", description="Model identifier")
     host: str = Field(default="0.0.0.0", description="Server host")
     port: int = Field(default=8000, description="Server port")
     max_model_len: int | None = Field(default=40000, description="Maximum model length (reduced from 262144 for 48GB GPUs)")
@@ -28,24 +30,47 @@ class ServerConfig(BaseModel):
         max_model_len_env = os.getenv("VLLM_MAX_MODEL_LEN")
         cpu_offload_env = os.getenv("VLLM_CPU_OFFLOAD_GB")
         
-        # Handle max_model_len: use env value if set, otherwise default to 40000
-        max_model_len = int(max_model_len_env) if max_model_len_env else 40000
+        # Get model ID
+        model_id = os.getenv("VLLM_MODEL", "openai/gpt-oss-20b")
         
-        # Handle cpu_offload_gb: use env value if set, otherwise default to 24
-        # If explicitly set to "0", use 0 (None), otherwise default to 24
-        if cpu_offload_env is None:
-            cpu_offload_gb = 24
-        elif cpu_offload_env == "0":
-            cpu_offload_gb = None  # Disable CPU offloading
+        # Get model-specific defaults from registry
+        model_info = get_model_info(model_id)
+        
+        # Handle max_model_len: use env value if set, otherwise check model registry, then default to 40000
+        if max_model_len_env:
+            max_model_len = int(max_model_len_env)
+        elif model_info and "max_model_len" in model_info:
+            max_model_len = model_info["max_model_len"]
         else:
-            cpu_offload_gb = int(cpu_offload_env)
+            max_model_len = 40000
+        
+        # Handle cpu_offload_gb: use env value if set, otherwise check model registry, then default to 24
+        # If explicitly set to "0", use 0 (None), otherwise default to 24
+        if cpu_offload_env is not None:
+            if cpu_offload_env == "0":
+                cpu_offload_gb = None  # Disable CPU offloading
+            else:
+                cpu_offload_gb = int(cpu_offload_env)
+        elif model_info and "cpu_offload_gb" in model_info:
+            cpu_offload_gb = model_info["cpu_offload_gb"]
+        else:
+            cpu_offload_gb = 24
+        
+        # Handle gpu_memory_utilization: use env value if set, otherwise check model registry, then default to 0.8
+        gpu_memory_utilization_env = os.getenv("VLLM_GPU_MEMORY_UTILIZATION")
+        if gpu_memory_utilization_env:
+            gpu_memory_utilization = float(gpu_memory_utilization_env)
+        elif model_info and "gpu_memory_utilization" in model_info:
+            gpu_memory_utilization = model_info["gpu_memory_utilization"]
+        else:
+            gpu_memory_utilization = 0.8
         
         return cls(
-            model=os.getenv("VLLM_MODEL", "Qwen/Qwen3-30B-A3B-Instruct-2507"),
+            model=model_id,
             host=os.getenv("VLLM_HOST", "0.0.0.0"),
             port=int(os.getenv("VLLM_PORT", "8000")),
             max_model_len=max_model_len,
-            gpu_memory_utilization=float(os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.8")),
+            gpu_memory_utilization=gpu_memory_utilization,
             tensor_parallel_size=int(os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1")),
             cpu_offload_gb=cpu_offload_gb,
             trust_remote_code=os.getenv("VLLM_TRUST_REMOTE_CODE", "false").lower() == "true",

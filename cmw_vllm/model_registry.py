@@ -9,6 +9,14 @@ MODEL_REGISTRY = {
         "architecture": "qwen3_moe",
         "description": "Qwen3 30B A3B Instruct model (Mixture of Experts)",
     },
+    "openai/gpt-oss-20b": {
+        "name": "openai/gpt-oss-20b",
+        "size_gb": 40.0,  # Approximate size in GB for 20B parameter model
+        "context_window": 8192,  # Standard GPT context window
+        "architecture": "gpt",
+        "description": "OpenAI GPT OSS 20B model",
+        "gpu_memory_utilization": 0.6,  # Model-specific GPU memory utilization
+    },
 }
 
 

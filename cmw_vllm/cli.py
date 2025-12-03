@@ -67,7 +67,7 @@ def setup() -> None:
 
 
 @cli.command()
-@click.argument("model_id", default="Qwen/Qwen3-30B-A3B-Instruct-2507")
+@click.argument("model_id", default="openai/gpt-oss-20b")
 @click.option("--local-dir", type=click.Path(path_type=Path), help="Local directory to download to")
 @click.option("--no-resume", is_flag=True, help="Don't resume interrupted downloads")
 @click.option("--skip-space-check", is_flag=True, help="Skip disk space check")
@@ -126,14 +126,25 @@ def start(
     # Create config
     config = ServerConfig.from_env()
 
-    # Override with CLI options
+    # Override model if provided via CLI
     if model:
         config.model = model
+        # Apply model-specific defaults if model changed and settings weren't explicitly provided via CLI
+        model_info = get_model_info(config.model)
+        if model_info:
+            if max_model_len is None and "max_model_len" in model_info:
+                config.max_model_len = model_info["max_model_len"]
+            if gpu_memory_utilization is None and "gpu_memory_utilization" in model_info:
+                config.gpu_memory_utilization = model_info["gpu_memory_utilization"]
+            if cpu_offload_gb is None and "cpu_offload_gb" in model_info:
+                config.cpu_offload_gb = model_info["cpu_offload_gb"]
+    
+    # Apply explicit CLI overrides (these take precedence over model defaults)
     if port:
         config.port = port
     if host:
         config.host = host
-    if max_model_len:
+    if max_model_len is not None:
         config.max_model_len = max_model_len
     if gpu_memory_utilization is not None:
         config.gpu_memory_utilization = gpu_memory_utilization
@@ -308,7 +319,7 @@ def info(base_url: str) -> None:
 
 
 @cli.command()
-@click.argument("model_id", default="Qwen/Qwen3-30B-A3B-Instruct-2507")
+@click.argument("model_id", default="openai/gpt-oss-20b")
 def verify(model_id: str) -> None:
     """Verify model is downloaded and valid."""
     click.echo(f"Verifying model: {model_id}")

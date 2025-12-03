@@ -60,7 +60,7 @@ def check_server_status(base_url: str = "http://localhost:8000", timeout: int = 
 
 def test_inference(
     base_url: str = "http://localhost:8000",
-    model: str = "Qwen/Qwen3-30B-A3B-Instruct-2507",
+    model: str = "openai/gpt-oss-20b",
     timeout: int = 30,
 ) -> dict[str, Any]:
     """Test inference with a simple request.
