@@ -80,11 +80,14 @@ class ServerConfig(BaseModel):
         
         # Handle tool_call_parser: use env value if set, otherwise check model config.json, 
         # then model registry, then default to "hermes"
-        # Note: We read from config.json directly (no patching needed) - models can include
-        # tool_call_parser in their config.json, or it can be added manually
+        # Note: gpt-oss models require --tool-call-parser openai for function calling
+        # See: https://docs.vllm.ai/projects/recipes/en/latest/OpenAI/GPT-OSS.html#function-calling
         tool_call_parser_env = os.getenv("VLLM_TOOL_CALL_PARSER")
         if tool_call_parser_env:
             tool_call_parser = tool_call_parser_env
+        elif model_id.startswith("openai/gpt-oss"):
+            # gpt-oss models require --tool-call-parser openai for function calling
+            tool_call_parser = "openai"
         else:
             # Try to read from model config.json file (if model authors included it)
             tool_call_parser_from_config = get_model_config_value(model_id, "tool_call_parser")
@@ -161,10 +164,13 @@ class ServerConfig(BaseModel):
         if self.download_dir:
             args.extend(["--download-dir", self.download_dir])
 
-        if self.enable_auto_tool_choice:
+        # Only add --enable-auto-tool-choice if tool_call_parser is also set,
+        # as vLLM requires --tool-call-parser when --enable-auto-tool-choice is used
+        if self.enable_auto_tool_choice and self.tool_call_parser:
             args.append("--enable-auto-tool-choice")
-
-        if self.tool_call_parser:
+            args.extend(["--tool-call-parser", self.tool_call_parser])
+        elif self.tool_call_parser:
+            # Add tool_call_parser even if enable_auto_tool_choice is False
             args.extend(["--tool-call-parser", self.tool_call_parser])
 
         if self.tokenizer_mode:

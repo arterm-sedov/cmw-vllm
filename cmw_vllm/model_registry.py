@@ -12,10 +12,15 @@ MODEL_REGISTRY = {
     "openai/gpt-oss-20b": {
         "name": "openai/gpt-oss-20b",
         "size_gb": 40.0,  # Approximate size in GB for 20B parameter model
-        "context_window": 8192,  # Standard GPT context window
+        "context_window": 131072,  # Model's native context window (128k-131k tokens)
+        "max_model_len": 40000,  # vLLM max sequence length (reduced from 131k for GPU memory constraints)
         "architecture": "gpt",
         "description": "OpenAI GPT OSS 20B model",
         "gpu_memory_utilization": 0.6,  # Model-specific GPU memory utilization
+        # Note: gpt-oss models require --tool-call-parser openai --enable-auto-tool-choice for function calling
+        # See: https://docs.vllm.ai/projects/recipes/en/latest/OpenAI/GPT-OSS.html#function-calling
+        "tool_call_parser": "openai",  # Required for function calling with gpt-oss models
+        # Context length: 128,000-131,072 tokens (combined input + output)
     },
     "mistralai/Ministral-3-14B-Instruct-2512": {
         "name": "mistralai/Ministral-3-14B-Instruct-2512",
