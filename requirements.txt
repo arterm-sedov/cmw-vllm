@@ -1,5 +1,6 @@
 # Core dependencies
 vllm>=0.6.0
+flashinfer-python>=0.5.0  # High-performance attention kernels for faster inference
 huggingface-hub>=0.20.0
 pydantic>=2.5.0
 pydantic-settings>=2.0.0

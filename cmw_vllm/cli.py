@@ -115,6 +115,9 @@ def download(model_id: str, local_dir: Path | None, no_resume: bool, skip_space_
 @click.option("--cpu-offload-gb", type=int, help="CPU offload memory in GB (for large models on limited GPU memory)")
 @click.option("--trust-remote-code", is_flag=True, help="Trust remote code (required for some custom tokenizers)")
 @click.option("--tool-call-parser", type=str, help="Tool call parser (mistral for Mistral models, hermes for Qwen models)")
+@click.option("--tokenizer-mode", type=str, help="Tokenizer mode (mistral for Mistral models)")
+@click.option("--config-format", type=str, help="Config format (mistral for Mistral models)")
+@click.option("--load-format", type=str, help="Load format (mistral for Mistral models)")
 @click.option("--foreground", "-f", is_flag=True, help="Run in foreground (don't detach)")
 def start(
     model: str | None,
@@ -125,6 +128,9 @@ def start(
     cpu_offload_gb: int | None,
     trust_remote_code: bool,
     tool_call_parser: str | None,
+    tokenizer_mode: str | None,
+    config_format: str | None,
+    load_format: str | None,
     foreground: bool,
 ) -> None:
     """Start vLLM server."""
@@ -182,6 +188,12 @@ def start(
         config.trust_remote_code = True
     if tool_call_parser is not None:
         config.tool_call_parser = tool_call_parser
+    if tokenizer_mode is not None:
+        config.tokenizer_mode = tokenizer_mode
+    if config_format is not None:
+        config.config_format = config_format
+    if load_format is not None:
+        config.load_format = load_format
 
     click.echo(f"Starting vLLM server with model: {config.model}")
     click.echo(f"Server will be available at: http://{config.host}:{config.port}")
