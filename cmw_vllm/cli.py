@@ -9,6 +9,7 @@ import click
 from cmw_vllm.health_check import check_server_status, get_server_info, test_inference
 from cmw_vllm.logging import setup_logging
 from cmw_vllm.model_downloader import check_model_downloaded, download_model
+from cmw_vllm.model_config_patcher import get_model_config_value
 from cmw_vllm.model_registry import get_model_info
 from cmw_vllm.model_verifier import verify_model_integrity
 from cmw_vllm.server_config import ServerConfig
@@ -112,6 +113,8 @@ def download(model_id: str, local_dir: Path | None, no_resume: bool, skip_space_
 @click.option("--max-model-len", type=int, help="Maximum model length")
 @click.option("--gpu-memory-utilization", type=float, help="GPU memory utilization (0.0-1.0)")
 @click.option("--cpu-offload-gb", type=int, help="CPU offload memory in GB (for large models on limited GPU memory)")
+@click.option("--trust-remote-code", is_flag=True, help="Trust remote code (required for some custom tokenizers)")
+@click.option("--tool-call-parser", type=str, help="Tool call parser (mistral for Mistral models, hermes for Qwen models)")
 @click.option("--foreground", "-f", is_flag=True, help="Run in foreground (don't detach)")
 def start(
     model: str | None,
@@ -120,6 +123,8 @@ def start(
     max_model_len: int | None,
     gpu_memory_utilization: float | None,
     cpu_offload_gb: int | None,
+    trust_remote_code: bool,
+    tool_call_parser: str | None,
     foreground: bool,
 ) -> None:
     """Start vLLM server."""
@@ -130,7 +135,12 @@ def start(
     if model:
         config.model = model
         # Apply model-specific defaults if model changed and settings weren't explicitly provided via CLI
+        # Priority: model config.json > model registry
         model_info = get_model_info(config.model)
+        
+        # Check model config.json first (if available)
+        tool_call_parser_from_config = get_model_config_value(config.model, "tool_call_parser")
+        
         if model_info:
             if max_model_len is None and "max_model_len" in model_info:
                 config.max_model_len = model_info["max_model_len"]
@@ -138,6 +148,24 @@ def start(
                 config.gpu_memory_utilization = model_info["gpu_memory_utilization"]
             if cpu_offload_gb is None and "cpu_offload_gb" in model_info:
                 config.cpu_offload_gb = model_info["cpu_offload_gb"]
+            if not trust_remote_code and "trust_remote_code" in model_info:
+                config.trust_remote_code = model_info["trust_remote_code"]
+            # Use model config.json if available, otherwise fall back to registry
+            if tool_call_parser is None:
+                if tool_call_parser_from_config:
+                    config.tool_call_parser = tool_call_parser_from_config
+                elif "tool_call_parser" in model_info:
+                    config.tool_call_parser = model_info["tool_call_parser"]
+            # Apply Mistral-specific format settings from registry
+            if "tokenizer_mode" in model_info:
+                config.tokenizer_mode = model_info["tokenizer_mode"]
+            if "config_format" in model_info:
+                config.config_format = model_info["config_format"]
+            if "load_format" in model_info:
+                config.load_format = model_info["load_format"]
+        elif tool_call_parser is None and tool_call_parser_from_config:
+            # Model not in registry but has config.json with tool_call_parser
+            config.tool_call_parser = tool_call_parser_from_config
     
     # Apply explicit CLI overrides (these take precedence over model defaults)
     if port:
@@ -150,6 +178,10 @@ def start(
         config.gpu_memory_utilization = gpu_memory_utilization
     if cpu_offload_gb is not None:
         config.cpu_offload_gb = cpu_offload_gb
+    if trust_remote_code:
+        config.trust_remote_code = True
+    if tool_call_parser is not None:
+        config.tool_call_parser = tool_call_parser
 
     click.echo(f"Starting vLLM server with model: {config.model}")
     click.echo(f"Server will be available at: http://{config.host}:{config.port}")

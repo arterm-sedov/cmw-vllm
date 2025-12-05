@@ -1,11 +1,21 @@
 #!/bin/bash
 # Quick curl test for vLLM
 
-echo "Testing vLLM inference..."
-curl -X POST http://localhost:8000/v1/chat/completions \
+MODEL=${1:-"mistralai/Ministral-3-14B-Instruct-2512"}
+QUESTION=${2:-"What is the capital of France?"}
+
+echo "Testing vLLM inference with model: $MODEL"
+echo "Question: $QUESTION"
+echo ""
+
+curl -X POST "http://localhost:8000/v1/chat/completions" \
   -H "Content-Type: application/json" \
-  -d '{
-    "model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
-    "messages": [{"role": "user", "content": "Say hello in one sentence."}],
-    "max_tokens": 50
-  }' | jq .
+  --data "{
+    \"model\": \"$MODEL\",
+    \"messages\": [
+      {
+        \"role\": \"user\",
+        \"content\": \"$QUESTION\"
+      }
+    ]
+  }" | jq .

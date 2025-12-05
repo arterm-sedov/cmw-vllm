@@ -17,6 +17,20 @@ MODEL_REGISTRY = {
         "description": "OpenAI GPT OSS 20B model",
         "gpu_memory_utilization": 0.6,  # Model-specific GPU memory utilization
     },
+    "mistralai/Ministral-3-14B-Instruct-2512": {
+        "name": "mistralai/Ministral-3-14B-Instruct-2512",
+        "size_gb": 28.0,  # Approximate size in GB for 14B parameter model
+        "context_window": 32768,  # Mistral models typically have 32K context window
+        "architecture": "mistral",
+        "description": "Mistral Ministral-3 14B Instruct model",
+        "trust_remote_code": True,  # Required for custom tokenizer
+        "tool_call_parser": "mistral",  # Mistral models use MistralToolParser for tool calling
+        "max_model_len": 32768,  # Match the model's context window
+        "gpu_memory_utilization": 0.6,  # Same as Qwen for consistent memory usage
+        "tokenizer_mode": "mistral",  # Required for Mistral models per official vLLM docs
+        "config_format": "mistral",  # Required for Mistral models per official vLLM docs
+        "load_format": "mistral",  # Required for Mistral models per official vLLM docs
+    },
 }
 
 

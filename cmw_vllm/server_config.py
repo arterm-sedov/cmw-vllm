@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from cmw_vllm.model_config_patcher import get_model_config_value
 from cmw_vllm.model_registry import get_model_info
 
 
@@ -22,7 +23,10 @@ class ServerConfig(BaseModel):
     trust_remote_code: bool = Field(default=False, description="Trust remote code")
     download_dir: str | None = Field(default=None, description="Model download directory")
     enable_auto_tool_choice: bool = Field(default=True, description="Enable auto tool choice for function calling")
-    tool_call_parser: str | None = Field(default="hermes", description="Tool call parser (hermes for Qwen models)")
+    tool_call_parser: str | None = Field(default="hermes", description="Tool call parser (mistral for Mistral models, hermes for Qwen models)")
+    tokenizer_mode: str | None = Field(default=None, description="Tokenizer mode (mistral for Mistral models)")
+    config_format: str | None = Field(default=None, description="Config format (mistral for Mistral models)")
+    load_format: str | None = Field(default=None, description="Load format (mistral for Mistral models)")
 
     @classmethod
     def from_env(cls) -> "ServerConfig":
@@ -65,6 +69,50 @@ class ServerConfig(BaseModel):
         else:
             gpu_memory_utilization = 0.8
         
+        # Handle trust_remote_code: use env value if set, otherwise check model registry, then default to False
+        trust_remote_code_env = os.getenv("VLLM_TRUST_REMOTE_CODE")
+        if trust_remote_code_env is not None:
+            trust_remote_code = trust_remote_code_env.lower() == "true"
+        elif model_info and "trust_remote_code" in model_info:
+            trust_remote_code = model_info["trust_remote_code"]
+        else:
+            trust_remote_code = False
+        
+        # Handle tool_call_parser: use env value if set, otherwise check model config.json, 
+        # then model registry, then default to "hermes"
+        # Note: We read from config.json directly (no patching needed) - models can include
+        # tool_call_parser in their config.json, or it can be added manually
+        tool_call_parser_env = os.getenv("VLLM_TOOL_CALL_PARSER")
+        if tool_call_parser_env:
+            tool_call_parser = tool_call_parser_env
+        else:
+            # Try to read from model config.json file (if model authors included it)
+            tool_call_parser_from_config = get_model_config_value(model_id, "tool_call_parser")
+            if tool_call_parser_from_config:
+                tool_call_parser = tool_call_parser_from_config
+            elif model_info and "tool_call_parser" in model_info:
+                # Fall back to registry (for models not yet updated with config.json)
+                tool_call_parser = model_info["tool_call_parser"]
+            else:
+                tool_call_parser = "hermes"
+        
+        # Handle tokenizer_mode, config_format, load_format: check model registry
+        tokenizer_mode = None
+        config_format = None
+        load_format = None
+        if model_info:
+            tokenizer_mode = model_info.get("tokenizer_mode")
+            config_format = model_info.get("config_format")
+            load_format = model_info.get("load_format")
+        
+        # Allow env var overrides
+        if os.getenv("VLLM_TOKENIZER_MODE"):
+            tokenizer_mode = os.getenv("VLLM_TOKENIZER_MODE")
+        if os.getenv("VLLM_CONFIG_FORMAT"):
+            config_format = os.getenv("VLLM_CONFIG_FORMAT")
+        if os.getenv("VLLM_LOAD_FORMAT"):
+            load_format = os.getenv("VLLM_LOAD_FORMAT")
+        
         return cls(
             model=model_id,
             host=os.getenv("VLLM_HOST", "0.0.0.0"),
@@ -73,10 +121,13 @@ class ServerConfig(BaseModel):
             gpu_memory_utilization=gpu_memory_utilization,
             tensor_parallel_size=int(os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1")),
             cpu_offload_gb=cpu_offload_gb,
-            trust_remote_code=os.getenv("VLLM_TRUST_REMOTE_CODE", "false").lower() == "true",
+            trust_remote_code=trust_remote_code,
             download_dir=os.getenv("MODEL_DOWNLOAD_DIR") or None,
             enable_auto_tool_choice=os.getenv("VLLM_ENABLE_AUTO_TOOL_CHOICE", "true").lower() == "true",
-            tool_call_parser=os.getenv("VLLM_TOOL_CALL_PARSER", "hermes") or None,
+            tool_call_parser=tool_call_parser,
+            tokenizer_mode=tokenizer_mode,
+            config_format=config_format,
+            load_format=load_format,
         )
 
     def to_vllm_args(self) -> list[str]:
@@ -115,5 +166,14 @@ class ServerConfig(BaseModel):
 
         if self.tool_call_parser:
             args.extend(["--tool-call-parser", self.tool_call_parser])
+
+        if self.tokenizer_mode:
+            args.extend(["--tokenizer-mode", self.tokenizer_mode])
+
+        if self.config_format:
+            args.extend(["--config-format", self.config_format])
+
+        if self.load_format:
+            args.extend(["--load-format", self.load_format])
 
         return args

@@ -4,7 +4,7 @@ import requests
 import json
 import sys
 
-def test_vllm_inference(base_url: str = "http://localhost:8000", model: str = "Qwen/Qwen3-30B-A3B-Instruct-2507"):
+def test_vllm_inference(base_url: str = "http://localhost:8000", model: str = "mistralai/Ministral-3-14B-Instruct-2512"):
     """Test vLLM inference with a simple request."""
     
     # First check if server is running
@@ -73,7 +73,7 @@ def test_vllm_inference(base_url: str = "http://localhost:8000", model: str = "Q
 
 if __name__ == "__main__":
     base_url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
-    model = sys.argv[2] if len(sys.argv) > 2 else "Qwen/Qwen3-30B-A3B-Instruct-2507"
+    model = sys.argv[2] if len(sys.argv) > 2 else "mistralai/Ministral-3-14B-Instruct-2512"
     
     success = test_vllm_inference(base_url, model)
     sys.exit(0 if success else 1)

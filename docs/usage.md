@@ -141,14 +141,31 @@ VLLM_API_KEY=EMPTY
 
 Use vLLM server directly via OpenAI-compatible API:
 
+**Using curl:**
+```bash
+curl -X POST "http://localhost:8000/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "model": "mistralai/Ministral-3-14B-Instruct-2512",
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the capital of France?"
+      }
+    ]
+  }'
+```
+
+**Using Python:**
 ```python
 import requests
 
 response = requests.post(
     "http://localhost:8000/v1/chat/completions",
     json={
-        "model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
-        "messages": [{"role": "user", "content": "Hello!"}],
+        "model": "mistralai/Ministral-3-14B-Instruct-2512",
+        "messages": [{"role": "user", "content": "What is the capital of France?"}],
     },
 )
+print(response.json())
 ```
