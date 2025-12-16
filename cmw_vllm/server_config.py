@@ -27,6 +27,11 @@ class ServerConfig(BaseModel):
     tokenizer_mode: str | None = Field(default=None, description="Tokenizer mode (mistral for Mistral models)")
     config_format: str | None = Field(default=None, description="Config format (mistral for Mistral models)")
     load_format: str | None = Field(default=None, description="Load format (mistral for Mistral models)")
+    dtype: str | None = Field(default=None, description='Model dtype passed to vLLM (e.g., "auto", "float16", "bfloat16")')
+    speculative_config: str | None = Field(
+        default=None,
+        description="JSON string passed to vLLM --speculative-config (e.g. MTP settings)",
+    )
 
     @classmethod
     def from_env(cls) -> "ServerConfig":
@@ -103,10 +108,14 @@ class ServerConfig(BaseModel):
         tokenizer_mode = None
         config_format = None
         load_format = None
+        dtype = None
+        speculative_config = None
         if model_info:
             tokenizer_mode = model_info.get("tokenizer_mode")
             config_format = model_info.get("config_format")
             load_format = model_info.get("load_format")
+            dtype = model_info.get("dtype")
+            speculative_config = model_info.get("speculative_config")
         
         # Allow env var overrides
         if os.getenv("VLLM_TOKENIZER_MODE"):
@@ -115,6 +124,10 @@ class ServerConfig(BaseModel):
             config_format = os.getenv("VLLM_CONFIG_FORMAT")
         if os.getenv("VLLM_LOAD_FORMAT"):
             load_format = os.getenv("VLLM_LOAD_FORMAT")
+        if os.getenv("VLLM_DTYPE"):
+            dtype = os.getenv("VLLM_DTYPE")
+        if os.getenv("VLLM_SPECULATIVE_CONFIG"):
+            speculative_config = os.getenv("VLLM_SPECULATIVE_CONFIG")
         
         return cls(
             model=model_id,
@@ -131,6 +144,8 @@ class ServerConfig(BaseModel):
             tokenizer_mode=tokenizer_mode,
             config_format=config_format,
             load_format=load_format,
+            dtype=dtype,
+            speculative_config=speculative_config,
         )
 
     def to_vllm_args(self) -> list[str]:
@@ -164,6 +179,9 @@ class ServerConfig(BaseModel):
         if self.download_dir:
             args.extend(["--download-dir", self.download_dir])
 
+        if self.dtype:
+            args.extend(["--dtype", self.dtype])
+
         # Only add --enable-auto-tool-choice if tool_call_parser is also set,
         # as vLLM requires --tool-call-parser when --enable-auto-tool-choice is used
         if self.enable_auto_tool_choice and self.tool_call_parser:
@@ -181,5 +199,9 @@ class ServerConfig(BaseModel):
 
         if self.load_format:
             args.extend(["--load-format", self.load_format])
+
+        if self.speculative_config:
+            # Pass JSON string directly; vLLM CLI will parse it
+            args.extend(["--speculative-config", self.speculative_config])
 
         return args

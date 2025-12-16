@@ -36,6 +36,20 @@ MODEL_REGISTRY = {
         "config_format": "mistral",  # Required for Mistral models per official vLLM docs
         "load_format": "mistral",  # Required for Mistral models per official vLLM docs
     },
+    "ai-sage/GigaChat3-10B-A1.8B-bf16": {
+        "name": "ai-sage/GigaChat3-10B-A1.8B-bf16",
+        "size_gb": 24.0,  # Approximate size in GB for 10B + 1.8B MoE model in BF16
+        "context_window": 256000,  # Поддерживает контекст до 256 тысяч токенов
+        "architecture": "gigachat3_moe",
+        "description": "GigaChat3 10B base with 1.8B active MoE experts (BF16)",
+        # Recommended vLLM launch options from model card:
+        # vllm serve ai-sage/GigaChat3-10B-A1.8B-bf16 \
+        #   --dtype auto \
+        #   --speculative-config '{"method": "mtp", "num_speculative_tokens": 1, "disable_padded_drafter_batch": false}'
+        "dtype": "auto",
+        "speculative_config": '{"method": "mtp", "num_speculative_tokens": 1, "disable_padded_drafter_batch": false}',
+        "gpu_memory_utilization": 0.6,
+    },
 }
 
 

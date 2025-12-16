@@ -118,6 +118,13 @@ def download(model_id: str, local_dir: Path | None, no_resume: bool, skip_space_
 @click.option("--tokenizer-mode", type=str, help="Tokenizer mode (mistral for Mistral models)")
 @click.option("--config-format", type=str, help="Config format (mistral for Mistral models)")
 @click.option("--load-format", type=str, help="Load format (mistral for Mistral models)")
+@click.option("--dtype", type=str, help='Model dtype passed to vLLM (e.g., "auto", "float16", "bfloat16")')
+@click.option(
+    "--speculative-config",
+    "speculative_config",
+    type=str,
+    help="JSON string passed to vLLM --speculative-config (e.g. MTP settings)",
+)
 @click.option("--foreground", "-f", is_flag=True, help="Run in foreground (don't detach)")
 def start(
     model: str | None,
@@ -131,6 +138,8 @@ def start(
     tokenizer_mode: str | None,
     config_format: str | None,
     load_format: str | None,
+    dtype: str | None,
+    speculative_config: str | None,
     foreground: bool,
 ) -> None:
     """Start vLLM server."""
@@ -169,6 +178,10 @@ def start(
                 config.config_format = model_info["config_format"]
             if "load_format" in model_info:
                 config.load_format = model_info["load_format"]
+            if dtype is None and "dtype" in model_info:
+                config.dtype = model_info["dtype"]
+            if speculative_config is None and "speculative_config" in model_info:
+                config.speculative_config = model_info["speculative_config"]
         elif tool_call_parser is None and tool_call_parser_from_config:
             # Model not in registry but has config.json with tool_call_parser
             config.tool_call_parser = tool_call_parser_from_config
@@ -194,6 +207,10 @@ def start(
         config.config_format = config_format
     if load_format is not None:
         config.load_format = load_format
+    if dtype is not None:
+        config.dtype = dtype
+    if speculative_config is not None:
+        config.speculative_config = speculative_config
 
     click.echo(f"Starting vLLM server with model: {config.model}")
     click.echo(f"Server will be available at: http://{config.host}:{config.port}")
