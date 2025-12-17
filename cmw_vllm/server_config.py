@@ -129,6 +129,15 @@ class ServerConfig(BaseModel):
         if os.getenv("VLLM_SPECULATIVE_CONFIG"):
             speculative_config = os.getenv("VLLM_SPECULATIVE_CONFIG")
         
+        # Handle enable_auto_tool_choice: use env value if set, otherwise check model registry, then default to True
+        enable_auto_tool_choice_env = os.getenv("VLLM_ENABLE_AUTO_TOOL_CHOICE")
+        if enable_auto_tool_choice_env is not None:
+            enable_auto_tool_choice = enable_auto_tool_choice_env.lower() == "true"
+        elif model_info and "enable_auto_tool_choice" in model_info:
+            enable_auto_tool_choice = model_info["enable_auto_tool_choice"]
+        else:
+            enable_auto_tool_choice = True
+        
         return cls(
             model=model_id,
             host=os.getenv("VLLM_HOST", "0.0.0.0"),
@@ -139,7 +148,7 @@ class ServerConfig(BaseModel):
             cpu_offload_gb=cpu_offload_gb,
             trust_remote_code=trust_remote_code,
             download_dir=os.getenv("MODEL_DOWNLOAD_DIR") or None,
-            enable_auto_tool_choice=os.getenv("VLLM_ENABLE_AUTO_TOOL_CHOICE", "true").lower() == "true",
+            enable_auto_tool_choice=enable_auto_tool_choice,
             tool_call_parser=tool_call_parser,
             tokenizer_mode=tokenizer_mode,
             config_format=config_format,

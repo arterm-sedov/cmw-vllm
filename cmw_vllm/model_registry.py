@@ -49,6 +49,17 @@ MODEL_REGISTRY = {
         "dtype": "auto",
         "speculative_config": '{"method": "mtp", "num_speculative_tokens": 1, "disable_padded_drafter_batch": false}',
         "gpu_memory_utilization": 0.6,
+        "tool_call_parser": "gigachat3",  # Custom plugin parser for GigaChat3 models
+    },
+    "cerebras/Qwen3-Coder-REAP-25B-A3B": {
+        "name": "cerebras/Qwen3-Coder-REAP-25B-A3B",
+        "size_gb": 25.5,  # Approximate size in GB for 25B parameter MoE model
+        "context_window": 262144,  # Qwen3 models typically have 256K context window
+        "architecture": "qwen3_moe",
+        "description": "Cerebras Qwen3 Coder REAP 25B A3B model (Mixture of Experts, code-specialized)",
+        # Qwen3-Coder models use XML format for tool calling and require --tool-call-parser qwen3_xml
+        # See: https://docs.vllm.ai/en/stable/features/tool_calling/?h=qwen3+coder#qwen3-coder-models-qwen3_xml
+        "tool_call_parser": "qwen3_xml",  # Required for function calling with Qwen3-Coder models (XML format)
     },
 }
 

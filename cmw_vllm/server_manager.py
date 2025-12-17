@@ -52,8 +52,17 @@ class VLLMServerManager:
             logger.error("vLLM is not installed. Install it with: pip install vllm")
             return False
 
-        # Build command
-        cmd = [sys.executable, "-m", "vllm.entrypoints.openai.api_server"]
+        # Build command - use wrapper script to register plugin before vLLM validates parsers
+        wrapper_script = str(Path(__file__).parent / "vllm_wrapper.py")
+        project_root = Path(__file__).parent.parent
+        cmd = [sys.executable, wrapper_script]
+        # Set PYTHONPATH to include project root so cmw_vllm can be imported
+        env = os.environ.copy()
+        pythonpath = env.get("PYTHONPATH", "")
+        if pythonpath:
+            env["PYTHONPATH"] = f"{project_root}:{pythonpath}"
+        else:
+            env["PYTHONPATH"] = str(project_root)
         cmd.extend(self.config.to_vllm_args())
 
         logger.info(f"Starting vLLM server with command: {' '.join(cmd)}")
@@ -66,13 +75,14 @@ class VLLMServerManager:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     start_new_session=True,
+                    env=env,
                 )
                 # Save PID
                 self.pid_file.write_text(str(self.process.pid))
                 logger.info(f"Server started in background (PID: {self.process.pid})")
             else:
                 # Run in foreground
-                subprocess.run(cmd, check=True)
+                subprocess.run(cmd, check=True, env=env)
                 return True
 
             # Capture stderr in background to see errors
