@@ -214,12 +214,28 @@ Test files:
 - `tests/test_tool_calls.py` - Standalone tool call test script
 - `tests/test_gigachat3_standalone.py` - Standalone test script for GigaChat3
 
+## KV Cache Offloading (vLLM v1+)
+
+For vLLM v1 (0.12.0+), use **LMCache KV cache offloading** instead of the deprecated `--cpu-offload-gb`:
+
+```bash
+# In .env
+VLLM_KV_OFFLOADING_BACKEND=lmcache
+VLLM_KV_OFFLOADING_SIZE=5.0  # GB
+VLLM_DISABLE_HYBRID_KV_CACHE_MANAGER=true
+```
+
+This offloads KV cache (not model weights) to CPU/disk, which is more efficient for long-context scenarios and multi-round conversations.
+
+See [docs/lmcache_kv_offloading.md](docs/lmcache_kv_offloading.md) for detailed documentation.
+
 ## Requirements
 
 - Python >= 3.10
 - CUDA-capable GPU (recommended)
-- vLLM >= 0.6.0
+- vLLM >= 0.6.0 (v1 engine in 0.12.0+)
 - HuggingFace Hub
+- lmcache (optional, for KV cache offloading)
 
 ## Project Structure
 

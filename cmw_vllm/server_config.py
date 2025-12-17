@@ -26,7 +26,24 @@ class ServerConfig(BaseModel):
     max_model_len: int | None = Field(default=40000, description="Maximum model length (reduced from 262144 for 48GB GPUs)")
     gpu_memory_utilization: float = Field(default=0.8, ge=0.0, le=1.0, description="GPU memory utilization")
     tensor_parallel_size: int = Field(default=1, ge=1, description="Tensor parallel size")
-    cpu_offload_gb: int | None = Field(default=24, ge=0, description="CPU offload memory in GB (for large models on limited GPU memory)")
+    cpu_offload_gb: int | None = Field(
+        default=24,
+        ge=0,
+        description="CPU offload memory in GB (DEPRECATED in vLLM v1 - use kv_offloading_size instead)",
+    )
+    kv_offloading_backend: str | None = Field(
+        default=None,
+        description="KV cache offloading backend (e.g., 'lmcache' for LMCache in vLLM v1)",
+    )
+    kv_offloading_size: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="KV cache offloading size in GB (for LMCache in vLLM v1)",
+    )
+    disable_hybrid_kv_cache_manager: bool = Field(
+        default=False,
+        description="Disable hybrid KV cache manager (required for LMCache offloading)",
+    )
     trust_remote_code: bool = Field(default=False, description="Trust remote code")
     download_dir: str | None = Field(default=None, description="Model download directory")
     enable_auto_tool_choice: bool = Field(default=True, description="Enable auto tool choice for function calling")
@@ -160,6 +177,9 @@ class ServerConfig(BaseModel):
             gpu_memory_utilization=gpu_memory_utilization,
             tensor_parallel_size=int(os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1")),
             cpu_offload_gb=cpu_offload_gb,
+            kv_offloading_backend=os.getenv("VLLM_KV_OFFLOADING_BACKEND") or None,
+            kv_offloading_size=float(os.getenv("VLLM_KV_OFFLOADING_SIZE")) if os.getenv("VLLM_KV_OFFLOADING_SIZE") else None,
+            disable_hybrid_kv_cache_manager=os.getenv("VLLM_DISABLE_HYBRID_KV_CACHE_MANAGER", "false").lower() == "true",
             trust_remote_code=trust_remote_code,
             download_dir=os.getenv("MODEL_DOWNLOAD_DIR") or None,
             enable_auto_tool_choice=enable_auto_tool_choice,
@@ -193,8 +213,17 @@ class ServerConfig(BaseModel):
         if self.max_model_len:
             args.extend(["--max-model-len", str(self.max_model_len)])
 
+        # Note: cpu_offload_gb is deprecated in vLLM v1, but kept for backward compatibility
         if self.cpu_offload_gb:
             args.extend(["--cpu-offload-gb", str(self.cpu_offload_gb)])
+
+        # LMCache KV cache offloading (vLLM v1+)
+        if self.kv_offloading_backend:
+            args.extend(["--kv-offloading-backend", self.kv_offloading_backend])
+        if self.kv_offloading_size is not None:
+            args.extend(["--kv-offloading-size", str(self.kv_offloading_size)])
+        if self.disable_hybrid_kv_cache_manager:
+            args.append("--disable-hybrid-kv-cache-manager")
 
         if self.trust_remote_code:
             args.append("--trust-remote-code")
