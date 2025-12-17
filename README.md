@@ -164,6 +164,56 @@ VLLM_API_KEY=EMPTY
 
 Then `cmw-rag` will connect to the vLLM server via HTTP (OpenAI-compatible API).
 
+## Testing
+
+The repository includes comprehensive tests for inference and tool calling functionality.
+
+### Standalone Test Script
+
+Run the standalone test script for quick manual testing:
+
+```bash
+# Test with default server and model
+python tests/test_gigachat3_standalone.py
+
+# Test with custom server URL
+python tests/test_gigachat3_standalone.py http://localhost:8000
+
+# Test with custom server and model
+python tests/test_gigachat3_standalone.py http://localhost:8000 ai-sage/GigaChat3-10B-A1.8B-bf16
+```
+
+The standalone script tests:
+- Simple inference
+- Tool calling
+- Complete tool calling flow (with tool results)
+- Streaming inference
+- Streaming with tool calls
+
+### Pytest Tests
+
+Run pytest tests (requires `pytest` to be installed):
+
+```bash
+# Install pytest
+pip install pytest
+
+# Run all tests
+pytest tests/
+
+# Run specific test file
+pytest tests/test_gigachat3_inference_and_tools.py
+
+# Run with verbose output
+pytest tests/ -v
+```
+
+Test files:
+- `tests/test_gigachat3_inference_and_tools.py` - Pytest tests for GigaChat3 inference and tool calling
+- `tests/test_gpt_oss_function_calling.py` - Pytest tests for GPT-OSS function calling
+- `tests/test_tool_calls.py` - Standalone tool call test script
+- `tests/test_gigachat3_standalone.py` - Standalone test script for GigaChat3
+
 ## Requirements
 
 - Python >= 3.10

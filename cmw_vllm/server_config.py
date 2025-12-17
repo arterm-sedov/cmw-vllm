@@ -6,6 +6,13 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    # dotenv is optional - if not installed, just skip loading .env file
+    def load_dotenv(*args, **kwargs):
+        pass
+
 from cmw_vllm.model_config_patcher import get_model_config_value
 from cmw_vllm.model_registry import get_model_info
 
@@ -36,6 +43,12 @@ class ServerConfig(BaseModel):
     @classmethod
     def from_env(cls) -> "ServerConfig":
         """Create configuration from environment variables."""
+        # Load .env file if it exists (in project root)
+        project_root = Path(__file__).parent.parent
+        env_file = project_root / ".env"
+        if env_file.exists():
+            load_dotenv(env_file, override=True)
+        
         max_model_len_env = os.getenv("VLLM_MAX_MODEL_LEN")
         cpu_offload_env = os.getenv("VLLM_CPU_OFFLOAD_GB")
         
@@ -61,7 +74,8 @@ class ServerConfig(BaseModel):
             else:
                 cpu_offload_gb = int(cpu_offload_env)
         elif model_info and "cpu_offload_gb" in model_info:
-            cpu_offload_gb = model_info["cpu_offload_gb"]
+            cpu_offload_gb_val = model_info["cpu_offload_gb"]
+            cpu_offload_gb = None if cpu_offload_gb_val == 0 else cpu_offload_gb_val
         else:
             cpu_offload_gb = 24
         
