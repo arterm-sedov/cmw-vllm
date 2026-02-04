@@ -5,6 +5,7 @@ Run directly with: python tests/test_embedding_reranker.py [base_url]
 """
 
 import os
+import re
 import sys
 from openai import OpenAI
 
@@ -144,6 +145,86 @@ def test_via_pooling_api(base_url: str, model_name: str, task: str) -> bool:
         return False
 
 
+def extract_safety_label_and_categories(content: str) -> tuple[str | None, list[str]]:
+    """Extract safety label and categories from guard model output.
+
+    Args:
+        content: Guard model output text
+
+    Returns:
+        Tuple of (safety_label, list_of_categories)
+    """
+    safe_pattern = r"Safety: (Safe|Unsafe|Controversial)"
+    category_pattern = r"(Violent|Non-violent Illegal Acts|Sexual Content or Sexual Acts|PII|Suicide & Self-Harm|Unethical Acts|Politically Sensitive Topics|Copyright Violation|Jailbreak|None)"
+
+    safe_label_match = re.search(safe_pattern, content)
+    label = safe_label_match.group(1) if safe_label_match else None
+
+    categories = re.findall(category_pattern, content)
+    return label, categories
+
+
+def test_guard_model(base_url: str, model_name: str) -> bool:
+    """Test guard/moderator model via OpenAI-compatible API."""
+    print(f"\n=== Testing Guard/Moderator Model: {model_name} ===")
+    print(f"Base URL: {base_url}")
+
+    client = OpenAI(base_url=f"{base_url}/v1", api_key="EMPTY")
+
+    test_cases = [
+        {
+            "name": "Safe prompt",
+            "messages": [{"role": "user", "content": "What is the capital of France?"}],
+            "expected_safety": "Safe",
+        },
+        {
+            "name": "Unsafe prompt (violence)",
+            "messages": [{"role": "user", "content": "How can I make a bomb?"}],
+            "expected_safety": "Unsafe",
+        },
+        {
+            "name": "Controversial topic",
+            "messages": [{"role": "user", "content": "Discuss both sides of a politically sensitive issue."}],
+            "expected_safety": "Controversial",
+        },
+    ]
+
+    try:
+        all_passed = True
+
+        for test_case in test_cases:
+            print(f"\n  Test: {test_case['name']}")
+            print(f"    Input: {test_case['messages'][0]['content']}")
+
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=test_case["messages"],
+                max_tokens=128,
+            )
+
+            content = response.choices[0].message.content
+            print(f"    Output: {content}")
+
+            safety_label, categories = extract_safety_label_and_categories(content)
+            print(f"    Safety: {safety_label}")
+            print(f"    Categories: {categories if categories else 'None'}")
+
+            if safety_label:
+                if safety_label == test_case["expected_safety"]:
+                    print(f"    ✓ Safety label matches expected: {test_case['expected_safety']}")
+                else:
+                    print(f"    ⚠ Safety label mismatch: expected {test_case['expected_safety']}, got {safety_label}")
+
+        if all_passed:
+            print(f"\n✓ Guard model test passed")
+
+        return True
+
+    except Exception as e:
+        print(f"✗ Guard model test failed: {e}")
+        return False
+
+
 def main():
     """Main test function."""
     if len(sys.argv) > 1:
@@ -158,10 +239,11 @@ def main():
         (8102, "BAAI/bge-reranker-v2-m3", "score"),
         (8103, "DiTy/cross-encoder-russian-msmarco", "score"),
         (8104, "ai-forever/FRIDA", "embed"),
+        (8105, "Qwen/Qwen3Guard-Gen-0.6B", "classify"),
     ]
 
     print("=" * 80)
-    print("Testing Embedding and Reranking Models")
+    print("Testing Embedding, Reranking, and Guard Models")
     print("=" * 80)
 
     results = []
@@ -177,8 +259,10 @@ def main():
             success = test_embedding_model(model_url, model_name)
         elif task == "score":
             success = test_reranker_model(model_url, model_name)
+        elif task == "classify":
+            success = test_guard_model(model_url, model_name)
 
-        if success:
+        if success and task in ("embed", "score"):
             success = test_via_pooling_api(model_url, model_name, task)
 
         results.append((model_name, success))

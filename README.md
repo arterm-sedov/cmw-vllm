@@ -244,6 +244,7 @@ The embedding/reranking script tests:
 - Embedding API (OpenAI-compatible)
 - Reranker API (score endpoint)
 - Pooling API (generic pooling interface)
+- Guard/Moderator API (safety classification)
 
 ### Pytest Tests
 
