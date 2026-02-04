@@ -81,6 +81,80 @@ MODEL_REGISTRY = {
         # See: https://docs.vllm.ai/en/stable/features/tool_calling/?h=qwen3+coder#qwen3-coder-models-qwen3_xml
         "tool_call_parser": "qwen3_xml",  # Required for function calling with Qwen3-Coder models (XML format)
     },
+    # Embedding Models
+    "Qwen/Qwen3-Embedding-0.6B": {
+        "name": "Qwen/Qwen3-Embedding-0.6B",
+        "size_gb": 1.2,  # 0.6B parameter model in FP16/BF16
+        "context_window": 32768,  # Qwen3 embedding models support 32K context
+        "architecture": "qwen3_embedding",
+        "description": "Qwen3 Embedding 0.6B model - lightweight embedding model for text representation",
+        "max_model_len": 32768,
+        "gpu_memory_utilization": 0.5,  # Lower utilization for small embedding models
+        "cpu_offload_gb": 0,
+        "trust_remote_code": False,
+        "task": "embed",  # Pooling task for embedding models
+        "runner": "pooling",  # Use pooling runner for embedding models
+        "dtype": "float16",
+    },
+    "ai-forever/FRIDA": {
+        "name": "ai-forever/FRIDA",
+        "size_gb": 1.0,  # Small Russian embedding model
+        "context_window": 512,  # Typical for sentence-transformer style models
+        "architecture": "sentence_transformer",
+        "description": "FRIDA - Russian text embedding model by ai-forever",
+        "max_model_len": 512,
+        "gpu_memory_utilization": 0.3,
+        "cpu_offload_gb": 0,
+        "trust_remote_code": False,
+        "task": "embed",
+        "runner": "pooling",
+        "dtype": "float16",
+    },
+    # Reranker Models
+    "Qwen/Qwen3-Reranker-0.6B": {
+        "name": "Qwen/Qwen3-Reranker-0.6B",
+        "size_gb": 1.2,  # 0.6B parameter model
+        "context_window": 32768,
+        "architecture": "qwen3_reranker",
+        "description": "Qwen3 Reranker 0.6B model - cross-encoder reranker for RAG systems",
+        "max_model_len": 32768,
+        "gpu_memory_utilization": 0.5,
+        "cpu_offload_gb": 0,
+        "trust_remote_code": False,
+        "task": "score",  # Pooling task for reranking/scoring
+        "runner": "pooling",
+        "dtype": "float16",
+    },
+    "DiTy/cross-encoder-russian-msmarco": {
+        "name": "DiTy/cross-encoder-russian-msmarco",
+        "size_gb": 0.5,  # Small cross-encoder model
+        "context_window": 512,
+        "architecture": "cross_encoder",
+        "description": "Russian cross-encoder reranker trained on MS Marco dataset",
+        "max_model_len": 512,
+        "gpu_memory_utilization": 0.3,
+        "cpu_offload_gb": 0,
+        "trust_remote_code": False,
+        "task": "score",
+        "runner": "pooling",
+        "dtype": "float16",
+    },
+    "BAAI/bge-reranker-v2-m3": {
+        "name": "BAAI/bge-reranker-v2-m3",
+        "size_gb": 2.5,  # BGE reranker v2-m3
+        "context_window": 8192,  # Supports up to 8K tokens
+        "architecture": "bge_reranker",
+        "description": "BAAI BGE Reranker v2-m3 - multilingual reranker supporting 100+ languages",
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.5,
+        "cpu_offload_gb": 0,
+        "trust_remote_code": False,
+        "task": "score",
+        "runner": "pooling",
+        "dtype": "float16",
+        # BGE-M3 specific: supports sparse and colbert embeddings
+        "hf_overrides": '{"architectures": ["BgeM3EmbeddingModel"]}',
+    },
 }
 
 

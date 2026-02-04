@@ -125,6 +125,13 @@ def download(model_id: str, local_dir: Path | None, no_resume: bool, skip_space_
     type=str,
     help="JSON string passed to vLLM --speculative-config (e.g. MTP settings)",
 )
+@click.option("--task", type=str, help="Pooling task type (embed, score, classify) for embedding/reranker models")
+@click.option("--runner", type=str, help="Model runner type (auto, generate, pooling)")
+@click.option(
+    "--hf-overrides",
+    type=str,
+    help="HuggingFace config overrides as JSON string (e.g. for BGE-M3 models)",
+)
 @click.option("--foreground", "-f", is_flag=True, help="Run in foreground (don't detach)")
 def start(
     model: str | None,
@@ -140,6 +147,9 @@ def start(
     load_format: str | None,
     dtype: str | None,
     speculative_config: str | None,
+    task: str | None,
+    runner: str | None,
+    hf_overrides: str | None,
     foreground: bool,
 ) -> None:
     """Start vLLM server."""
@@ -182,6 +192,13 @@ def start(
                 config.dtype = model_info["dtype"]
             if speculative_config is None and "speculative_config" in model_info:
                 config.speculative_config = model_info["speculative_config"]
+            # Pooling model parameters (embedding/reranking)
+            if task is None and "task" in model_info:
+                config.task = model_info["task"]
+            if runner is None and "runner" in model_info:
+                config.runner = model_info["runner"]
+            if hf_overrides is None and "hf_overrides" in model_info:
+                config.hf_overrides = model_info["hf_overrides"]
         elif tool_call_parser is None and tool_call_parser_from_config:
             # Model not in registry but has config.json with tool_call_parser
             config.tool_call_parser = tool_call_parser_from_config
@@ -211,6 +228,12 @@ def start(
         config.dtype = dtype
     if speculative_config is not None:
         config.speculative_config = speculative_config
+    if task is not None:
+        config.task = task
+    if runner is not None:
+        config.runner = runner
+    if hf_overrides is not None:
+        config.hf_overrides = hf_overrides
 
     click.echo(f"Starting vLLM server with model: {config.model}")
     click.echo(f"Server will be available at: http://{config.host}:{config.port}")

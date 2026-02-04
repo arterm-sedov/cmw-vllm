@@ -1,4 +1,5 @@
 """Server configuration management."""
+
 from __future__ import annotations
 
 import os
@@ -13,6 +14,7 @@ except ImportError:
     def load_dotenv(*args, **kwargs):
         pass
 
+
 from cmw_vllm.model_config_patcher import get_model_config_value
 from cmw_vllm.model_registry import get_model_info
 
@@ -23,8 +25,12 @@ class ServerConfig(BaseModel):
     model: str = Field(default="openai/gpt-oss-20b", description="Model identifier")
     host: str = Field(default="0.0.0.0", description="Server host")
     port: int = Field(default=8000, description="Server port")
-    max_model_len: int | None = Field(default=40000, description="Maximum model length (reduced from 262144 for 48GB GPUs)")
-    gpu_memory_utilization: float = Field(default=0.8, ge=0.0, le=1.0, description="GPU memory utilization")
+    max_model_len: int | None = Field(
+        default=40000, description="Maximum model length (reduced from 262144 for 48GB GPUs)"
+    )
+    gpu_memory_utilization: float = Field(
+        default=0.8, ge=0.0, le=1.0, description="GPU memory utilization"
+    )
     tensor_parallel_size: int = Field(default=1, ge=1, description="Tensor parallel size")
     cpu_offload_gb: int | None = Field(
         default=24,
@@ -46,15 +52,40 @@ class ServerConfig(BaseModel):
     )
     trust_remote_code: bool = Field(default=False, description="Trust remote code")
     download_dir: str | None = Field(default=None, description="Model download directory")
-    enable_auto_tool_choice: bool = Field(default=True, description="Enable auto tool choice for function calling")
-    tool_call_parser: str | None = Field(default="hermes", description="Tool call parser (mistral for Mistral models, hermes for Qwen models)")
-    tokenizer_mode: str | None = Field(default=None, description="Tokenizer mode (mistral for Mistral models)")
-    config_format: str | None = Field(default=None, description="Config format (mistral for Mistral models)")
-    load_format: str | None = Field(default=None, description="Load format (mistral for Mistral models)")
-    dtype: str | None = Field(default=None, description='Model dtype passed to vLLM (e.g., "auto", "float16", "bfloat16")')
+    enable_auto_tool_choice: bool = Field(
+        default=True, description="Enable auto tool choice for function calling"
+    )
+    tool_call_parser: str | None = Field(
+        default="hermes",
+        description="Tool call parser (mistral for Mistral models, hermes for Qwen models)",
+    )
+    tokenizer_mode: str | None = Field(
+        default=None, description="Tokenizer mode (mistral for Mistral models)"
+    )
+    config_format: str | None = Field(
+        default=None, description="Config format (mistral for Mistral models)"
+    )
+    load_format: str | None = Field(
+        default=None, description="Load format (mistral for Mistral models)"
+    )
+    dtype: str | None = Field(
+        default=None, description='Model dtype passed to vLLM (e.g., "auto", "float16", "bfloat16")'
+    )
     speculative_config: str | None = Field(
         default=None,
         description="JSON string passed to vLLM --speculative-config (e.g. MTP settings)",
+    )
+    task: str | None = Field(
+        default=None,
+        description="Pooling task type (embed, score, classify) for embedding/reranker models",
+    )
+    runner: str | None = Field(
+        default=None,
+        description="Model runner type (auto, generate, pooling) - defaults to auto",
+    )
+    hf_overrides: str | None = Field(
+        default=None,
+        description="HuggingFace config overrides as JSON string (e.g. for BGE-M3 models)",
     )
 
     @classmethod
@@ -65,16 +96,16 @@ class ServerConfig(BaseModel):
         env_file = project_root / ".env"
         if env_file.exists():
             load_dotenv(env_file, override=True)
-        
+
         max_model_len_env = os.getenv("VLLM_MAX_MODEL_LEN")
         cpu_offload_env = os.getenv("VLLM_CPU_OFFLOAD_GB")
-        
+
         # Get model ID
         model_id = os.getenv("VLLM_MODEL", "openai/gpt-oss-20b")
-        
+
         # Get model-specific defaults from registry
         model_info = get_model_info(model_id)
-        
+
         # Handle max_model_len: use env value if set, otherwise check model registry, then default to 40000
         if max_model_len_env:
             max_model_len = int(max_model_len_env)
@@ -82,7 +113,7 @@ class ServerConfig(BaseModel):
             max_model_len = model_info["max_model_len"]
         else:
             max_model_len = 40000
-        
+
         # Handle cpu_offload_gb: use env value if set, otherwise check model registry, then default to 24
         # If explicitly set to "0", use 0 (None), otherwise default to 24
         if cpu_offload_env is not None:
@@ -95,7 +126,7 @@ class ServerConfig(BaseModel):
             cpu_offload_gb = None if cpu_offload_gb_val == 0 else cpu_offload_gb_val
         else:
             cpu_offload_gb = 24
-        
+
         # Handle gpu_memory_utilization: use env value if set, otherwise check model registry, then default to 0.8
         gpu_memory_utilization_env = os.getenv("VLLM_GPU_MEMORY_UTILIZATION")
         if gpu_memory_utilization_env:
@@ -104,7 +135,7 @@ class ServerConfig(BaseModel):
             gpu_memory_utilization = model_info["gpu_memory_utilization"]
         else:
             gpu_memory_utilization = 0.8
-        
+
         # Handle trust_remote_code: use env value if set, otherwise check model registry, then default to False
         trust_remote_code_env = os.getenv("VLLM_TRUST_REMOTE_CODE")
         if trust_remote_code_env is not None:
@@ -113,8 +144,8 @@ class ServerConfig(BaseModel):
             trust_remote_code = model_info["trust_remote_code"]
         else:
             trust_remote_code = False
-        
-        # Handle tool_call_parser: use env value if set, otherwise check model config.json, 
+
+        # Handle tool_call_parser: use env value if set, otherwise check model config.json,
         # then model registry, then default to "hermes"
         # Note: gpt-oss models require --tool-call-parser openai for function calling
         # See: https://docs.vllm.ai/projects/recipes/en/latest/OpenAI/GPT-OSS.html#function-calling
@@ -134,20 +165,26 @@ class ServerConfig(BaseModel):
                 tool_call_parser = model_info["tool_call_parser"]
             else:
                 tool_call_parser = "hermes"
-        
-        # Handle tokenizer_mode, config_format, load_format: check model registry
+
+        # Handle tokenizer_mode, config_format, load_format, task, runner, hf_overrides: check model registry
         tokenizer_mode = None
         config_format = None
         load_format = None
         dtype = None
         speculative_config = None
+        task = None
+        runner = None
+        hf_overrides = None
         if model_info:
             tokenizer_mode = model_info.get("tokenizer_mode")
             config_format = model_info.get("config_format")
             load_format = model_info.get("load_format")
             dtype = model_info.get("dtype")
             speculative_config = model_info.get("speculative_config")
-        
+            task = model_info.get("task")
+            runner = model_info.get("runner")
+            hf_overrides = model_info.get("hf_overrides")
+
         # Allow env var overrides
         if os.getenv("VLLM_TOKENIZER_MODE"):
             tokenizer_mode = os.getenv("VLLM_TOKENIZER_MODE")
@@ -159,7 +196,13 @@ class ServerConfig(BaseModel):
             dtype = os.getenv("VLLM_DTYPE")
         if os.getenv("VLLM_SPECULATIVE_CONFIG"):
             speculative_config = os.getenv("VLLM_SPECULATIVE_CONFIG")
-        
+        if os.getenv("VLLM_TASK"):
+            task = os.getenv("VLLM_TASK")
+        if os.getenv("VLLM_RUNNER"):
+            runner = os.getenv("VLLM_RUNNER")
+        if os.getenv("VLLM_HF_OVERRIDES"):
+            hf_overrides = os.getenv("VLLM_HF_OVERRIDES")
+
         # Handle enable_auto_tool_choice: use env value if set, otherwise check model registry, then default to True
         enable_auto_tool_choice_env = os.getenv("VLLM_ENABLE_AUTO_TOOL_CHOICE")
         if enable_auto_tool_choice_env is not None:
@@ -168,7 +211,7 @@ class ServerConfig(BaseModel):
             enable_auto_tool_choice = model_info["enable_auto_tool_choice"]
         else:
             enable_auto_tool_choice = True
-        
+
         return cls(
             model=model_id,
             host=os.getenv("VLLM_HOST", "0.0.0.0"),
@@ -178,8 +221,13 @@ class ServerConfig(BaseModel):
             tensor_parallel_size=int(os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1")),
             cpu_offload_gb=cpu_offload_gb,
             kv_offloading_backend=os.getenv("VLLM_KV_OFFLOADING_BACKEND") or None,
-            kv_offloading_size=float(os.getenv("VLLM_KV_OFFLOADING_SIZE")) if os.getenv("VLLM_KV_OFFLOADING_SIZE") else None,
-            disable_hybrid_kv_cache_manager=os.getenv("VLLM_DISABLE_HYBRID_KV_CACHE_MANAGER", "false").lower() == "true",
+            kv_offloading_size=float(os.getenv("VLLM_KV_OFFLOADING_SIZE"))
+            if os.getenv("VLLM_KV_OFFLOADING_SIZE")
+            else None,
+            disable_hybrid_kv_cache_manager=os.getenv(
+                "VLLM_DISABLE_HYBRID_KV_CACHE_MANAGER", "false"
+            ).lower()
+            == "true",
             trust_remote_code=trust_remote_code,
             download_dir=os.getenv("MODEL_DOWNLOAD_DIR") or None,
             enable_auto_tool_choice=enable_auto_tool_choice,
@@ -189,6 +237,9 @@ class ServerConfig(BaseModel):
             load_format=load_format,
             dtype=dtype,
             speculative_config=speculative_config,
+            task=task,
+            runner=runner,
+            hf_overrides=hf_overrides,
         )
 
     def to_vllm_args(self) -> list[str]:
@@ -255,5 +306,13 @@ class ServerConfig(BaseModel):
         if self.speculative_config:
             # Pass JSON string directly; vLLM CLI will parse it
             args.extend(["--speculative-config", self.speculative_config])
+
+        # Pooling model parameters (for embedding/reranking models)
+        if self.task:
+            args.extend(["--task", self.task])
+        if self.runner:
+            args.extend(["--runner", self.runner])
+        if self.hf_overrides:
+            args.extend(["--hf-overrides", self.hf_overrides])
 
         return args

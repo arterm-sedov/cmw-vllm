@@ -17,6 +17,7 @@ Chat with DeepWiki to get answers about this repo:
 - **Server Management**: Start, stop, and monitor vLLM servers
 - **Health Checks**: Verify server status and test inference
 - **Configuration**: Environment-based configuration with sensible defaults
+- **Multi-Model Support**: LLM, embedding, and reranking models via pooling runner
 
 ## Installation
 
@@ -106,6 +107,46 @@ VLLM_TENSOR_PARALLEL_SIZE=1
 
 See `.env.example` for all available options.
 
+## Supported Models
+
+cmw-vllm supports various model types with optimized configurations:
+
+### LLM Models (Generation)
+- `Qwen/Qwen3-30B-A3B-Instruct-2507` - Qwen3 30B Mixture of Experts
+- `openai/gpt-oss-20b` - OpenAI GPT OSS 20B
+- `mistralai/Ministral-3-14B-Instruct-2512` - Mistral Ministral-3 14B
+- `ai-sage/GigaChat3-10B-A1.8B-bf16` - Russian GigaChat3 MoE
+- `cerebras/Qwen3-Coder-REAP-25B-A3B` - Qwen3 Coder code-specialized
+
+### Embedding Models (Pooling)
+- `Qwen/Qwen3-Embedding-0.6B` - Qwen3 lightweight embedding (32K context)
+- `ai-forever/FRIDA` - Russian text embedding model
+
+### Reranker Models (Pooling)
+- `Qwen/Qwen3-Reranker-0.6B` - Qwen3 cross-encoder reranker
+- `BAAI/bge-reranker-v2-m3` - Multilingual reranker (100+ languages)
+- `DiTy/cross-encoder-russian-msmarco` - Russian reranker for MS MARCO
+
+### Starting Embedding/Reranker Servers
+
+```bash
+# Start embedding server
+cmw-vllm start --model Qwen/Qwen3-Embedding-0.6B --port 8100
+
+# Start reranker server
+cmw-vllm start --model Qwen/Qwen3-Reranker-0.6B --port 8101
+cmw-vllm start --model BAAI/bge-reranker-v2-m3 --port 8102
+```
+
+Embedding and reranker models use vLLM's pooling runner (`--runner pooling`) with appropriate tasks (`--task embed` or `--task score`).
+
+**Note:** Default configuration is optimized for 48GB GPUs (RTX 4090, A6000, etc.):
+- `max_model_len=40000`: Reduced from 262144 to fit KV cache in available GPU memory
+- `gpu_memory_utilization=0.8`: Leaves headroom for other processes
+- `cpu_offload_gb=24`: Offloads model weights to CPU RAM for large models
+
+See `.env.example` for all available options.
+
 ## Commands
 
 ### `cmw-vllm setup`
@@ -129,6 +170,9 @@ Start vLLM server.
 - `--max-model-len LEN`: Maximum model length (default: 40000 for 48GB GPUs)
 - `--gpu-memory-utilization FLOAT`: GPU memory utilization (0.0-1.0, default: 0.8)
 - `--cpu-offload-gb INT`: CPU offload memory in GB (default: 24 for large models)
+- `--task TASK`: Pooling task type (embed, score, classify) for embedding/reranker models
+- `--runner RUNNER`: Model runner type (auto, generate, pooling)
+- `--hf-overrides JSON`: HuggingFace config overrides (e.g. for BGE-M3 models)
 - `--foreground, -f`: Run in foreground (don't detach)
 
 ### `cmw-vllm stop`
@@ -166,29 +210,31 @@ Then `cmw-rag` will connect to the vLLM server via HTTP (OpenAI-compatible API).
 
 ## Testing
 
-The repository includes comprehensive tests for inference and tool calling functionality.
+The repository includes comprehensive tests for inference, tool calling, and pooling models.
 
-### Standalone Test Script
+### Standalone Test Scripts
 
-Run the standalone test script for quick manual testing:
+Run standalone test scripts for quick manual testing:
 
 ```bash
-# Test with default server and model
-python tests/test_gigachat3_standalone.py
-
-# Test with custom server URL
+# Test LLM inference and tool calling
 python tests/test_gigachat3_standalone.py http://localhost:8000
 
-# Test with custom server and model
-python tests/test_gigachat3_standalone.py http://localhost:8000 ai-sage/GigaChat3-10B-A1.8B-bf16
+# Test embedding and reranking models
+python tests/test_embedding_reranker.py http://localhost:8100
 ```
 
-The standalone script tests:
+The LLM standalone script tests:
 - Simple inference
 - Tool calling
 - Complete tool calling flow (with tool results)
 - Streaming inference
 - Streaming with tool calls
+
+The embedding/reranking script tests:
+- Embedding API (OpenAI-compatible)
+- Reranker API (score endpoint)
+- Pooling API (generic pooling interface)
 
 ### Pytest Tests
 
@@ -202,17 +248,22 @@ pip install pytest
 pytest tests/
 
 # Run specific test file
-pytest tests/test_gigachat3_inference_and_tools.py
+pytest tests/test_embedding_reranker_models.py
 
 # Run with verbose output
 pytest tests/ -v
+
+# Run with coverage
+pytest tests/ --cov=cmw_vllm --cov-report=term-missing
 ```
 
 Test files:
 - `tests/test_gigachat3_inference_and_tools.py` - Pytest tests for GigaChat3 inference and tool calling
 - `tests/test_gpt_oss_function_calling.py` - Pytest tests for GPT-OSS function calling
+- `tests/test_embedding_reranker_models.py` - Pytest tests for embedding and reranking models
 - `tests/test_tool_calls.py` - Standalone tool call test script
 - `tests/test_gigachat3_standalone.py` - Standalone test script for GigaChat3
+- `tests/test_embedding_reranker.py` - Standalone test script for embedding and reranking models
 
 ## KV Cache Offloading (vLLM v1+)
 
@@ -233,7 +284,7 @@ See [docs/lmcache_kv_offloading.md](docs/lmcache_kv_offloading.md) for detailed 
 
 - Python >= 3.10
 - CUDA-capable GPU (recommended)
-- vLLM >= 0.6.0 (v1 engine in 0.12.0+)
+- vLLM >= 0.15.0 (v1 engine with pooling support)
 - HuggingFace Hub
 - lmcache (optional, for KV cache offloading)
 
