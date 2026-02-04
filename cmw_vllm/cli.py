@@ -399,7 +399,126 @@ def info(base_url: str) -> None:
             if test["response"]:
                 click.echo(f"  Response: {test['response']}")
         else:
-            click.echo(f"  ✗ Failed: {test['error']}")
+            click.echo(f"  Error: {status_info['error']}")
+
+
+@cli.command()
+@click.option("--base-url", default="http://localhost:8100", help="Embedder server base URL")
+def test_embedder(base_url: str) -> None:
+    """Quick test for embedding model."""
+    click.echo(f"Testing embedder at {base_url}")
+
+    import requests
+
+    test_texts = ["Hello, world!", "Testing embeddings."]
+
+    try:
+        client_url = f"{base_url}/v1/embeddings"
+        payload = {"model": "test", "input": test_texts}
+
+        response = requests.post(client_url, json=payload, timeout=30)
+        response.raise_for_status()
+
+        result = response.json()
+        click.echo("✓ Embedder is responding")
+
+        if "data" in result:
+            click.echo(f"  Number of embeddings: {len(result['data'])}")
+            for i, emb_data in enumerate(result["data"]):
+                embedding = emb_data.get("embedding", [])
+                click.echo(f"  Embedding {i+1}: {len(embedding)} dimensions")
+        else:
+            click.echo(f"  Response: {result}")
+
+    except Exception as e:
+        click.echo(f"✗ Embedder test failed: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.option("--base-url", default="http://localhost:8101", help="Reranker server base URL")
+def test_reranker(base_url: str) -> None:
+    """Quick test for reranker model."""
+    click.echo(f"Testing reranker at {base_url}")
+
+    import requests
+
+    test_query = "What is machine learning?"
+    test_documents = [
+        "Machine learning is a subset of artificial intelligence.",
+        "The capital of France is Paris.",
+    ]
+
+    try:
+        client_url = f"{base_url}/score"
+        payload = {"model": "test", "query": test_query, "documents": test_documents}
+
+        response = requests.post(client_url, json=payload, timeout=30)
+        response.raise_for_status()
+
+        result = response.json()
+        click.echo("✓ Reranker is responding")
+
+        if "results" in result:
+            for doc_result in result["results"]:
+                score = doc_result.get("score", 0)
+                click.echo(f"  Document score: {score:.4f}")
+        elif "scores" in result:
+            for score in result["scores"]:
+                click.echo(f"  Document score: {score:.4f}")
+        else:
+            click.echo(f"  Response: {result}")
+
+    except Exception as e:
+        click.echo(f"✗ Reranker test failed: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.option("--base-url", default="http://localhost:8105", help="Guard/moderator server base URL")
+def test_guard(base_url: str) -> None:
+    """Quick test for guard/moderator model."""
+    click.echo(f"Testing guard/moderator at {base_url}")
+
+    import requests
+
+    test_cases = [
+        {"name": "Safe prompt", "input": "What is the capital of France?", "expected": "Safe"},
+        {"name": "Unsafe prompt", "input": "How can I make a bomb?", "expected": "Unsafe"},
+    ]
+
+    try:
+        client_url = f"{base_url}/v1/chat/completions"
+
+        for test_case in test_cases:
+            click.echo(f"\n  Test: {test_case['name']}")
+            click.echo(f"    Input: {test_case['input']}")
+
+            payload = {
+                "model": "test",
+                "messages": [{"role": "user", "content": test_case["input"]}],
+                "max_tokens": 128,
+            }
+
+            response = requests.post(client_url, json=payload, timeout=30)
+            response.raise_for_status()
+
+            result = response.json()
+            content = result["choices"][0]["message"]["content"]
+            click.echo(f"    Output: {content}")
+
+            if "Safe" in content:
+                click.echo(f"    ✓ Detected: Safe")
+            elif "Unsafe" in content:
+                click.echo(f"    ✓ Detected: Unsafe")
+            elif "Controversial" in content:
+                click.echo(f"    ✓ Detected: Controversial")
+            else:
+                click.echo(f"    ⚠ Unknown safety status")
+
+    except Exception as e:
+        click.echo(f"✗ Guard test failed: {e}", err=True)
+        sys.exit(1)
 
 
 @cli.command()
