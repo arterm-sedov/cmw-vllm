@@ -203,6 +203,24 @@ Show comprehensive server information including configuration and status.
 ### `cmw-vllm verify [MODEL_ID]`
 Verify model is downloaded and valid.
 
+### `cmw-vllm test-embedder [--base-url URL]`
+Quick test for embedding model.
+
+**Options:**
+- `--base-url URL`: Embedder server base URL (default: http://localhost:8100)
+
+### `cmw-vllm test-reranker [--base-url URL]`
+Quick test for reranker model.
+
+**Options:**
+- `--base-url URL`: Reranker server base URL (default: http://localhost:8101)
+
+### `cmw-vllm test-guard [--base-url URL]`
+Quick test for guard/moderator model.
+
+**Options:**
+- `--base-url URL`: Guard/moderator server base URL (default: http://localhost:8105)
+
 ## Integration with cmw-rag
 
 To use vLLM with `cmw-rag`, configure it as a provider:
