@@ -155,6 +155,21 @@ MODEL_REGISTRY = {
         # BGE-M3 specific: supports sparse and colbert embeddings
         "hf_overrides": '{"architectures": ["BgeM3EmbeddingModel"]}',
     },
+    # Guard/Moderator Models
+    "Qwen/Qwen3Guard-Gen-0.6B": {
+        "name": "Qwen/Qwen3Guard-Gen-0.6B",
+        "size_gb": 0.8,  # 0.6B parameter model in BF16
+        "context_window": 32768,  # Qwen3 guard models support 32K context
+        "architecture": "qwen3_guard",
+        "description": "Qwen3Guard Gen 0.6B - safety moderation model for 119 languages, classifies outputs as Safe, Unsafe, or Controversial",
+        "max_model_len": 32768,
+        "gpu_memory_utilization": 0.5,  # Lower utilization for guard models
+        "cpu_offload_gb": 0,
+        "trust_remote_code": False,
+        "task": "classify",  # Classification task for guard/moderator models
+        "runner": "pooling",
+        "dtype": "bfloat16",
+    },
 }
 
 

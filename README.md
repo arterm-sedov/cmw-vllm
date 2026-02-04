@@ -127,7 +127,10 @@ cmw-vllm supports various model types with optimized configurations:
 - `BAAI/bge-reranker-v2-m3` - Multilingual reranker (100+ languages)
 - `DiTy/cross-encoder-russian-msmarco` - Russian reranker for MS MARCO
 
-### Starting Embedding/Reranker Servers
+### Guard/Moderator Models (Pooling)
+- `Qwen/Qwen3Guard-Gen-0.6B` - Safety moderation model for 119 languages, classifies outputs as Safe, Unsafe, or Controversial
+
+### Starting Embedding/Reranker/Guard Servers
 
 ```bash
 # Start embedding server
@@ -136,9 +139,15 @@ cmw-vllm start --model Qwen/Qwen3-Embedding-0.6B --port 8100
 # Start reranker server
 cmw-vllm start --model Qwen/Qwen3-Reranker-0.6B --port 8101
 cmw-vllm start --model BAAI/bge-reranker-v2-m3 --port 8102
+
+# Start guard/moderation server
+cmw-vllm start --model Qwen/Qwen3Guard-Gen-0.6B --port 8105
 ```
 
-Embedding and reranker models use vLLM's pooling runner (`--runner pooling`) with appropriate tasks (`--task embed` or `--task score`).
+Embedding, reranker, and guard models use vLLM's pooling runner (`--runner pooling`) with appropriate tasks:
+- `--task embed` for embedding models
+- `--task score` for reranker models
+- `--task classify` for guard/moderator models
 
 **Note:** Default configuration is optimized for 48GB GPUs (RTX 4090, A6000, etc.):
 - `max_model_len=40000`: Reduced from 262144 to fit KV cache in available GPU memory

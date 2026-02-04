@@ -173,6 +173,40 @@ class TestServerConfigForPoolingModels:
             assert f"--runner {expected_runner}" in args_str, f"Model {model_id}: should include --runner {expected_runner}"
 
 
+class TestGuardModeratorModels:
+    """Tests for guard/moderator model configurations."""
+
+    def test_qwen3_guard_model(self):
+        """Test Qwen3Guard-Gen-0.6B model configuration."""
+        model_id = "Qwen/Qwen3Guard-Gen-0.6B"
+        model_info = get_model_info(model_id)
+
+        assert model_info is not None, f"Model {model_id} not found in registry"
+        assert model_info["task"] == "classify", "Task should be 'classify' for guard models"
+        assert model_info["runner"] == "pooling", "Runner should be 'pooling' for guard models"
+        assert model_info["dtype"] == "bfloat16", "Dtype should be bfloat16"
+        assert model_info["max_model_len"] == 32768, "Max model len should be 32768"
+        assert model_info["gpu_memory_utilization"] == 0.5, "Should use lower GPU memory for guard models"
+        assert "description" in model_info, "Should have description"
+
+    def test_guard_model_vllm_args(self):
+        """Test vLLM args for guard models."""
+        from cmw_vllm.server_config import ServerConfig
+
+        config = ServerConfig(
+            model="Qwen/Qwen3Guard-Gen-0.6B",
+            port=8105,
+            task="classify",
+            runner="pooling",
+        )
+
+        args = config.to_vllm_args()
+        args_str = " ".join(args)
+
+        assert "--task classify" in args_str, "Should include --task classify"
+        assert "--runner pooling" in args_str, "Should include --runner pooling"
+
+
 class TestModelRegistryIntegrity:
     """Tests for model registry integrity."""
 
@@ -184,6 +218,7 @@ class TestModelRegistryIntegrity:
             "Qwen/Qwen3-Reranker-0.6B",
             "BAAI/bge-reranker-v2-m3",
             "DiTy/cross-encoder-russian-msmarco",
+            "Qwen/Qwen3Guard-Gen-0.6B",
         ]
 
         for model_id in pooling_models:
@@ -193,7 +228,7 @@ class TestModelRegistryIntegrity:
             assert "runner" in model_info, f"Model {model_id}: missing 'runner' field"
             assert "dtype" in model_info, f"Model {model_id}: missing 'dtype' field"
             assert model_info["runner"] == "pooling", f"Model {model_id}: runner should be 'pooling'"
-            assert model_info["task"] in ["embed", "score"], f"Model {model_id}: task should be 'embed' or 'score'"
+            assert model_info["task"] in ["embed", "score", "classify"], f"Model {model_id}: task should be 'embed', 'score', or 'classify'"
 
     def test_model_ids_are_unique(self):
         """Test that all model IDs in registry are unique."""
