@@ -87,25 +87,69 @@ cmw-vllm stop
 
 ## Configuration
 
-Configuration is done via environment variables. Create a `.env` file:
+Configuration is done via environment variables. Create a `.env` file from the example:
 
 ```bash
-# .env
-VLLM_MODEL=Qwen/Qwen3-30B-A3B-Instruct-2507
-VLLM_PORT=8000
-VLLM_HOST=0.0.0.0
-VLLM_MAX_MODEL_LEN=40000
-VLLM_GPU_MEMORY_UTILIZATION=0.8
-VLLM_CPU_OFFLOAD_GB=24
-VLLM_TENSOR_PARALLEL_SIZE=1
+cp .env.example .env
 ```
 
-**Note:** Default configuration is optimized for 48GB GPUs (RTX 4090, A6000, etc.):
-- `max_model_len=40000`: Reduced from 262144 to fit KV cache in available GPU memory
-- `gpu_memory_utilization=0.8`: Leaves headroom for other processes
-- `cpu_offload_gb=24`: Offloads model weights to CPU RAM for large models
+**Important:** `.env.example` is the authoritative source of truth for all configuration options. The sections below document only the most commonly used variables. See `.env.example` for complete documentation with inline comments.
 
-See `.env.example` for all available options.
+### Core Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VLLM_MODEL` | `openai/gpt-oss-20b` | Model identifier (HuggingFace model ID) |
+| `VLLM_PORT` | `8000` | Server port |
+| `VLLM_HOST` | `0.0.0.0` | Server host address |
+| `VLLM_MAX_MODEL_LEN` | `40000` | Maximum sequence length |
+| `VLLM_GPU_MEMORY_UTILIZATION` | `0.8` | GPU memory usage (0.0-1.0) |
+| `VLLM_TRUST_REMOTE_CODE` | `false` | Required for some custom tokenizers |
+
+### Pooling Model Variables
+
+For embedding, reranking, and guard models (vLLM 0.15.0+):
+
+| Variable | Options | Description |
+|----------|---------|-------------|
+| `VLLM_TASK` | `embed`, `score`, `classify` | Pooling task type |
+| `VLLM_RUNNER` | `auto`, `generate`, `pooling` | Model runner type (use `pooling` for pooling models) |
+| `VLLM_HF_OVERRIDES` | JSON string | HuggingFace config overrides (e.g., for BGE-M3 models) |
+
+### Function Calling Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VLLM_ENABLE_AUTO_TOOL_CHOICE` | `true` | Enable auto tool choice for function calling |
+| `VLLM_TOOL_CALL_PARSER` | `hermes` | Tool call parser (hermes, mistral, qwen3_xml, openai, gigachat3) |
+| `VLLM_DTYPE` | `auto` | Model dtype (float16, bfloat16, auto) |
+
+### KV Cache Offloading (vLLM v1+)
+
+| Variable | Description |
+|----------|-------------|
+| `VLLM_KV_OFFLOADING_BACKEND` | Backend for KV offloading (e.g., `lmcache`) |
+| `VLLM_KV_OFFLOADING_SIZE` | Size in GB for KV cache offloading |
+| `VLLM_DISABLE_HYBRID_KV_CACHE_MANAGER` | Required for LMCache offloading |
+
+### Additional Variables
+
+Model-specific options (see `.env.example` for full list):
+- `VLLM_TOKENIZER_MODE`: Tokenizer mode (mistral for Mistral models)
+- `VLLM_CONFIG_FORMAT`: Config format (mistral for Mistral models)
+- `VLLM_LOAD_FORMAT`: Load format (mistral for Mistral models)
+- `VLLM_SPECULATIVE_CONFIG`: JSON string for speculative decoding (MTP settings)
+
+### Default Hardware Configuration
+
+Optimized for **48GB GPUs** (RTX 4090, A6000, etc.):
+- `VLLM_MAX_MODEL_LEN=40000`: Reduced from 262144 to fit KV cache
+- `VLLM_GPU_MEMORY_UTILIZATION=0.8`: Headroom for other processes
+- `VLLM_KV_OFFLOADING_SIZE=5.0`: KV cache offloading enabled (see LMCache docs)
+
+**Deprecated:** `VLLM_CPU_OFFLOAD_GB` is deprecated in vLLM v1. Use `VLLM_KV_OFFLOADING_*` instead.
+
+See `.env.example` for all available variables with descriptions and recommended values.
 
 ## Supported Models
 
@@ -149,12 +193,74 @@ Embedding, reranker, and guard models use vLLM's pooling runner (`--runner pooli
 - `--task score` for reranker models
 - `--task classify` for guard/moderator models
 
-**Note:** Default configuration is optimized for 48GB GPUs (RTX 4090, A6000, etc.):
-- `max_model_len=40000`: Reduced from 262144 to fit KV cache in available GPU memory
-- `gpu_memory_utilization=0.8`: Leaves headroom for other processes
-- `cpu_offload_gb=24`: Offloads model weights to CPU RAM for large models
+## Multi-Model Deployment
 
-See `.env.example` for all available options.
+cmw-vllm supports running multiple pooling models (embedding, reranker, guard) simultaneously using separate vLLM instances.
+
+### Running Models Simultaneously
+
+```bash
+# Start embedding server (port 8100)
+cmw-vllm start --model Qwen/Qwen3-Embedding-0.6B --port 8100 &
+
+# Start reranker server (port 8101)
+cmw-vllm start --model Qwen/Qwen3-Reranker-0.6B --port 8101 &
+
+# Start guard/moderation server (port 8105)
+cmw-vllm start --model Qwen/Qwen3Guard-Gen-0.6B --port 8105 &
+```
+
+### VRAM Management
+
+**Model sizes and requirements:**
+
+| Model Type | Example | Model Size | KV Cache | Context Window | vLLM Overhead | Total VRAM |
+|------------|---------|-----------|----------|----------------|---------------|-----------|
+| Embedding | Qwen3-0.6B | 1.2 GB | 1-2 GB | 32K | 1-2 GB | ~4-6 GB |
+| Reranker | Qwen3-0.6B | 1.2 GB | 0.5-1 GB | 32K | 1-2 GB | ~3-5 GB |
+| Reranker | BGE-M3 | 2.5 GB | 0.5-1 GB | 8K | 1-2 GB | ~4-5 GB |
+| Guard | Qwen3Guard | 0.8 GB | 0.5-1 GB | 32K | 1-2 GB | ~3-4 GB |
+| Embedding | FRIDA | 1.0 GB | 0.5-1 GB | 512 | 1-2 GB | ~3-4 GB |
+
+**VRAM estimates for common pooling model combinations:**
+
+| Embedder | Reranker | Guard | Total VRAM (approx) |
+|----------|----------|-------|-------------------|
+| Qwen3-0.6B | Qwen3-0.6B | Qwen3Guard | ~10-15 GB |
+| Qwen3-0.6B | BGE-M3 | Qwen3Guard | ~11-16 GB |
+| FRIDA | DiTy | Qwen3Guard | ~8-12 GB |
+
+**48GB GPU recommendations:**
+- Pooling-only: 3 models easily fit (~10-15 GB)
+- LLM + pooling: One LLM + 3 models may fit (see separate VRAM section for LLM combinations)
+
+### Process Management
+
+```bash
+# List all running vLLM processes
+cmw-vllm list --all
+
+# Test individual server status
+cmw-vllm test-embedder --base-url http://localhost:8100
+cmw-vllm test-reranker --base-url http://localhost:8101
+cmw-vllm test-guard --base-url http://localhost:8105
+
+# Stop specific models (if needed)
+pkill -f "Qwen3-Embedding-0.6B"
+```
+
+### Limitations
+
+- Each vLLM instance requires a separate port
+- No unified port routing without external API gateway
+- GPU memory is shared among all instances
+- Consider nginx/gateway for single-port API
+
+### Comparison with cmw-mosec
+
+cmw-mosec runs a single Mosec process with dynamic model loading on one port, while cmw-vllm runs separate vLLM instances:
+- **cmw-mosec**: Single process, single port, dynamic model swapping
+- **cmw-vllm**: Separate processes, separate ports, simpler architecture
 
 ## Commands
 
@@ -178,10 +284,17 @@ Start vLLM server.
 - `--host HOST`: Server host (default: 0.0.0.0)
 - `--max-model-len LEN`: Maximum model length (default: 40000 for 48GB GPUs)
 - `--gpu-memory-utilization FLOAT`: GPU memory utilization (0.0-1.0, default: 0.8)
-- `--cpu-offload-gb INT`: CPU offload memory in GB (default: 24 for large models)
-- `--task TASK`: Pooling task type (embed, score, classify) for embedding/reranker models
+- `--cpu-offload-gb INT`: CPU offload memory in GB (DEPRECATED, use KV offloading instead)
+- `--trust-remote-code`: Trust remote code (required for some custom tokenizers)
+- `--tool-call-parser`: Tool call parser (mistral, hermes, qwen3_xml, openai, gigachat3)
+- `--tokenizer-mode`: Tokenizer mode (mistral for Mistral models)
+- `--config-format`: Config format (mistral for Mistral models)
+- `--load-format`: Load format (mistral for Mistral models)
+- `--dtype`: Model dtype (auto, float16, bfloat16)
+- `--speculative-config`: JSON string for vLLM --speculative-config
+- `--task TASK`: Pooling task type (embed, score, classify) for pooling models
 - `--runner RUNNER`: Model runner type (auto, generate, pooling)
-- `--hf-overrides JSON`: HuggingFace config overrides (e.g. for BGE-M3 models)
+- `--hf-overrides`: HuggingFace config overrides (e.g., for BGE-M3 models)
 - `--foreground, -f`: Run in foreground (don't detach)
 
 ### `cmw-vllm stop`
