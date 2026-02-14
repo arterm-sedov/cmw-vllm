@@ -1,6 +1,6 @@
-# Agent Guide for cmw-mosec
+# Agent Guide for cmw-vllm
 
-This document provides guidance for AI agents working on the cmw-mosec project. Rule set for opencode: keep solutions lean; do not overengineer.
+This document provides guidance for AI agents working on the cmw-vllm project. Rule set for opencode: keep solutions lean; do not overengineer.
 
 ## Git & Commits
 
@@ -9,46 +9,60 @@ This document provides guidance for AI agents working on the cmw-mosec project. 
 
 ## Project Overview
 
-cmw-mosec is a CLI tool for managing Mosec embedding and reranker servers. It provides:
+cmw-vllm is a CLI tool for managing vLLM inference servers. It provides:
 - Server lifecycle management (start, stop, status)
-- Pre-configured model definitions
+- Model downloading and verification from HuggingFace
 - Process management with PID files
-- Health checking
+- Health checking and inference testing
+- GPU and disk space monitoring
 
 ## Architecture
 
 ```
-cmw_mosec/
+cmw_vllm/
 ├── __init__.py          # Package exports
 ├── cli.py              # Click CLI commands
-├── server_config.py    # Pydantic schemas and model definitions
-└── server_manager.py   # Process management
+├── server_config.py    # Pydantic schemas and server configuration
+├── server_manager.py   # Process management for vLLM servers
+├── model_downloader.py # HuggingFace model downloading
+├── model_verifier.py   # Model integrity verification
+├── model_registry.py   # Pre-configured model definitions
+├── gpu_info.py         # GPU detection and monitoring
+├── disk_space.py       # Disk space monitoring
+├── health_check.py     # HTTP health checks and inference testing
+└── logging.py          # Logging utilities
 ```
 
 ## Key Components
 
-### MosecModelConfig (Pydantic)
-Defines model configurations including:
+### ServerConfig (Pydantic)
+Defines vLLM server configurations including:
 - model_id: HuggingFace model identifier
 - port: Server port (unique per model)
-- memory_gb: Estimated VRAM usage
-- dtype: Data type (float16, float32, int8)
-- batch_size: Dynamic batching size
-- workers: Number of Mosec workers
+- tensor_parallel_size: Number of GPUs for tensor parallelism
+- gpu_memory_utilization: GPU memory fraction to use
+- max_model_len: Maximum sequence length
+- dtype: Data type (auto, float16, bfloat16, float32)
 
-### MosecServerManager
-Manages Mosec server processes:
-- start(): Launch server in background/foreground
+### ServerManager
+Manages vLLM server processes:
+- start(): Launch server in background with configured parameters
 - stop(): Graceful shutdown with fallback to force kill
 - get_status(): Check if server is running and responding
 - list_running(): List all servers with PID files
 
+### Model Management
+- ModelRegistry: Pre-configured popular models with optimized settings
+- ModelDownloader: Download from HuggingFace with progress tracking
+- ModelVerifier: Verify model integrity and compatibility
+
 ### CLI Commands
-- setup: Verify dependencies
-- start <model>: Start server for model
-- stop <model>: Stop server
-- status: Show running servers
-- list: Show available models
+- setup: Verify vLLM installation and GPU availability
+- start <model>: Start server for model with auto-detection
+- stop <model>: Stop server gracefully
+- status: Show running servers and their status
+- list: Show available models in registry
+- download <model>: Download model from HuggingFace
 
 ## Dependencies
 
@@ -56,106 +70,41 @@ Core:
 - click: CLI framework
 - pydantic: Data validation
 - requests: HTTP health checks
+- huggingface-hub: Model downloading
 
 External (user-installed):
-- mosec: The server framework
+- vllm: The actual inference server
 - torch: For GPU detection
-- transformers: For model loading
-- sentence-transformers: For reranker models
-- llmspec: OpenAI-compatible API schemas
-
-## Environment Setup
-
-- **Linux (native):** `source .venv/bin/activate`
-- **Install Dependencies:** `pip install -e .`
-
-## Build, Lint & Test
-
-### Testing
-- **Run all tests:** `pytest`
-- **Run specific test file:** `pytest tests/test_server_config.py`
-- **Run with coverage:** `pytest --cov=cmw_mosec --cov-report=term-missing`
-
-### Linting
-- **Lint modified files:** `ruff check <modified_file>`
-- **Auto-fix issues:** `ruff check --fix <modified_file>`
-
-## Test Practices
-
-Following industry best practices from Google Test Primer and IBM Unit Testing Guidelines:
-
-### Test Behavior, Not Implementation
-
-**Core Principle:** Tests should validate what code **does**, not **how** it does it.
-
-**BAD - Testing implementation details:**
-```python
-def test_server_port():
-    config = get_model_config("ai-forever/FRIDA")
-    assert config.port == 8001  # Fragile!
-```
-
-**GOOD - Testing behavior:**
-```python
-def test_embedding_config_valid():
-    config = get_model_config("ai-forever/FRIDA")
-    assert config.port > 7000  # Valid range
-    assert config.port < 65535  # Valid range
-    assert config.model_type == "embedding"
-```
-
-### Key Guidelines
-
-1. **Test Outcomes, Not Mechanisms**
-   - Test that a feature works correctly
-   - Don't test internal function calls or implementation paths
-   - Example: Test that config returns valid port range, not specific port
-
-2. **Avoid Hardcoded Values**
-   - Don't assert on specific ports, paths, or internal states
-   - Assert on functional requirements and valid patterns
-   - Example: Assert port is in valid range (7000-65535), not specific value
-
-3. **Test Behavior Contracts**
-   - Define what the function should do (inputs → outputs)
-   - Test the contract, not the implementation
-   - Example: "Given a model slug, return valid config" not "call registry.get()"
-
-4. **Use Mocks Judiciously**
-   - Mock external dependencies (HTTP APIs, file system)
-   - Don't mock internal implementation details
-
-5. **Test Real Scenarios**
-   - Test user-facing behavior
-   - Test edge cases and error handling
-   - Example: Test "unknown model raises error", not "ValueError raised"
 
 ## Error Handling
 
-- Use try/except around process operations
+- Use try/except around process and download operations
 - Log errors with logger, not print
-- Return True/False from manager methods
-- CLI catches exceptions and exits with code 1
+- Return structured results from manager methods
+- CLI catches exceptions and exits with appropriate codes
+- Handle GPU OOM and CUDA errors gracefully
 
 ## Platform Notes
 
-- Windows: SIGKILL not available, use SIGTERM
-- Linux/macOS: Full signal support
-- PID files stored in ~/.cmw-mosec/
+- Windows: Limited signal support, use process termination
+- Linux/macOS: Full signal support for graceful shutdown
+- PID files stored in ~/.cmw-vllm/
+- Models cached in HuggingFace default location (~/.cache/huggingface/)
 
 ## Development
 
-- Activate the project venv before running Python or tests
+- Activate the project venv before running Python or tests (e.g. `.venv\Scripts\Activate.ps1` on Windows, `source .venv/bin/activate` on Linux/macOS).
 
 ## Testing
 
 Test scenarios:
-1. Start/stop embedding server (ai-forever/FRIDA)
-2. Start/stop reranker server (DiTy/cross-encoder-russian-msmarco)
-3. Health check via HTTP
+1. Start/stop Qwen server
+2. Health check via HTTP API
+3. Model download and verification
 4. Multiple start calls (idempotent)
 5. Stop non-running server
 6. List running servers
+7. GPU memory calculation
 
 ## Agent Behavior
 
@@ -165,6 +114,22 @@ Test scenarios:
 - **Secrets:** Never hardcode secrets. Use environment variables.
 - **No breakage:** Never break existing code.
 
+### 12-Factor App Principles
+Following twelve-factor methodology for CLI/server tools:
+
+- **Codebase:** One codebase tracked in revision control, many deploys.
+- **Dependencies:** Declare all dependencies explicitly in `pyproject.toml`. See Development section for venv activation.
+- **Config:** Store all environment-specific config in env vars (never in code). Use `.env` files for local development.
+- **Backing Services:** Treat vLLM servers as attached resources. Server config (ports, model paths) via env vars or CLI args.
+- **Build, Release, Run:** Strictly separate build and run stages. Install package once, run anywhere.
+- **Processes:** Execute the app as stateless processes. Server state externalized (PID files, process management).
+- **Port Binding:** Each vLLM server exports service via configurable port. CLI binds to no port (local tool).
+- **Concurrency:** Scale out by running multiple server processes (one per model/GPU). CLI is single-user.
+- **Disposability:** Maximize robustness with fast startup and graceful shutdown. Servers start quickly and handle SIGTERM gracefully, finishing current requests before exiting.
+- **Dev/Prod Parity:** Keep development and production vLLM versions identical. Use same model versions across environments.
+- **Logs:** Treat logs as event streams. vLLM servers log to stdout/stderr; CLI logs to console. Optional file logging via `LOG_FILE_ENABLED` env var.
+- **Admin Processes:** Run admin tasks (model downloads, health checks, GPU monitoring) as one-off processes using the same CLI tool.
+
 ## Code Style
 
 - Follow Google docstring convention. Type hints required. Line length: 100. Use ruff for linting.
@@ -172,19 +137,3 @@ Test scenarios:
 - **Imports:** At top of file; ruff handles sorting.
 - **Comments:** Explain why, not what. Do not delete existing comments or logging; update if needed.
 - **Error handling:** Avoid unnecessary try/except. Catch only when necessary and meaningful. Prefer robust, explicit logic over hardcoded fallbacks.
-
-## 12-Factor App Principles
-
-Following twelve-factor methodology for the repository as a whole:
-
-- **Codebase:** One codebase tracked in revision control, many deploys.
-- **Dependencies:** Declare all dependencies explicitly in `pyproject.toml`.
-- **Config:** Store all environment-specific config in env vars. Use `.env` files for local dev.
-- **Backing Services:** Treat model caches, PID directories as attached resources.
-- **Build, Release, Run:** Separate build (pip install) and run (cmw-mosec start) stages.
-- **Processes:** Execute as stateless processes. PID files track state.
-- **Port Binding:** Export services via port binding. Port specified in config.
-- **Disposability:** Maximize robustness with fast startup and graceful shutdown.
-- **Dev/Prod Parity:** Keep development and production similar.
-- **Logs:** Treat logs as event streams. Use logging module.
-- **Admin Processes:** Run admin tasks (status, list) as one-off processes.
