@@ -1,4 +1,5 @@
 """Model registry and metadata."""
+
 from __future__ import annotations
 
 MODEL_REGISTRY = {
@@ -87,25 +88,39 @@ MODEL_REGISTRY = {
         "size_gb": 1.2,  # 0.6B parameter model in FP16/BF16
         "context_window": 32768,  # Qwen3 embedding models support 32K context
         "architecture": "qwen3_embedding",
-        "description": "Qwen3 Embedding 0.6B model - lightweight embedding model for text representation",
-        "max_model_len": 32768,
-        "gpu_memory_utilization": 0.5,  # Lower utilization for small embedding models
+        "description": "Qwen3 Embedding 0.6B model - lightweight multilingual embedding (1024 dim, 119+ languages, MRL)",
+        "max_model_len": 8192,  # Reduced for embedding inference efficiency
+        "gpu_memory_utilization": 0.3,  # Low utilization for small embedding models
         "cpu_offload_gb": 0,
-        "trust_remote_code": False,
+        "trust_remote_code": True,  # Required for Qwen3 embedding models
         "task": "embed",  # Pooling task for embedding models
         "runner": "pooling",  # Use pooling runner for embedding models
         "dtype": "float16",
     },
-    "ai-forever/FRIDA": {
-        "name": "ai-forever/FRIDA",
-        "size_gb": 1.0,  # Small Russian embedding model
-        "context_window": 512,  # Typical for sentence-transformer style models
-        "architecture": "sentence_transformer",
-        "description": "FRIDA - Russian text embedding model by ai-forever",
-        "max_model_len": 512,
-        "gpu_memory_utilization": 0.3,
+    "Qwen/Qwen3-Embedding-4B": {
+        "name": "Qwen/Qwen3-Embedding-4B",
+        "size_gb": 8.0,  # 4B parameter model in FP16/BF16
+        "context_window": 32768,
+        "architecture": "qwen3_embedding",
+        "description": "Qwen3 Embedding 4B model - high-quality multilingual embedding (2560 dim, 119+ languages, MRL)",
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.5,
         "cpu_offload_gb": 0,
-        "trust_remote_code": False,
+        "trust_remote_code": True,
+        "task": "embed",
+        "runner": "pooling",
+        "dtype": "float16",
+    },
+    "Qwen/Qwen3-Embedding-8B": {
+        "name": "Qwen/Qwen3-Embedding-8B",
+        "size_gb": 16.0,  # 8B parameter model in FP16/BF16
+        "context_window": 32768,
+        "architecture": "qwen3_embedding",
+        "description": "Qwen3 Embedding 8B model - state-of-the-art multilingual embedding (4096 dim, 119+ languages, MRL)",
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.7,
+        "cpu_offload_gb": 0,
+        "trust_remote_code": True,
         "task": "embed",
         "runner": "pooling",
         "dtype": "float16",

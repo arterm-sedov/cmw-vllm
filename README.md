@@ -163,8 +163,13 @@ cmw-vllm supports various model types with optimized configurations:
 - `cerebras/Qwen3-Coder-REAP-25B-A3B` - Qwen3 Coder code-specialized
 
 ### Embedding Models (Pooling)
-- `Qwen/Qwen3-Embedding-0.6B` - Qwen3 lightweight embedding (32K context)
-- `ai-forever/FRIDA` - Russian text embedding model
+
+**Note:** vLLM's pooling runner supports models with **last-token pooling** (causal LMs like Qwen3). Models requiring **CLS pooling** (T5-based like FRIDA) are not supported and should use cmw-mosec instead.
+
+Supported:
+- `Qwen/Qwen3-Embedding-0.6B` - Qwen3 lightweight embedding (1024 dim, 119+ languages, MRL)
+- `Qwen/Qwen3-Embedding-4B` - Qwen3 medium embedding (2560 dim, 119+ languages, MRL)
+- `Qwen/Qwen3-Embedding-8B` - Qwen3 large embedding (4096 dim, 119+ languages, MRL)
 
 ### Reranker Models (Pooling)
 - `Qwen/Qwen3-Reranker-0.6B` - Qwen3 cross-encoder reranker
@@ -192,6 +197,58 @@ Embedding, reranker, and guard models use vLLM's pooling runner (`--runner pooli
 - `--task embed` for embedding models
 - `--task score` for reranker models
 - `--task classify` for guard/moderator models
+
+## Qwen3 Embedding Usage
+
+Qwen3 embedding models require **instruction format** for queries per [HuggingFace documentation](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B).
+
+### Instruction Format
+
+```python
+def get_detailed_instruct(task_description: str, query: str) -> str:
+    """Format query with instruction for Qwen3 embedding models."""
+    return f'Instruct: {task_description}\nQuery: {query}'
+
+# Example usage
+task = 'Given a web search query, retrieve relevant passages that answer the query'
+query = get_detailed_instruct(task, 'What is machine learning?')
+# Result: 'Instruct: Given a web search query...\nQuery: What is machine learning?'
+```
+
+### Key Points
+
+1. **Queries MUST use instruction format** - Documents don't need instruction prefix
+2. **vLLM uses last-token pooling** automatically for Qwen3 models (configured in model registry)
+3. **Supports 119+ languages** - Same query in different languages will match
+4. **MRL (Matryoshka Representation Learning) enabled** - Can truncate embeddings if needed
+
+### API Example
+
+```bash
+# Query embedding (WITH instruction)
+curl -X POST http://localhost:8100/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen3-Embedding-0.6B",
+    "input": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: What is AI?"
+  }'
+
+# Document embedding (NO instruction)
+curl -X POST http://localhost:8100/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen3-Embedding-0.6B",
+    "input": "AI is artificial intelligence."
+  }'
+```
+
+### Performance Tips
+
+- Use `VLLM_GPU_MEMORY_UTILIZATION=0.3` for small embedding models (0.6B)
+- Use `VLLM_MAX_MODEL_LEN=8192` for embedding tasks (no need for 32K)
+- vLLM 0.15.0+ required for pooling runner support
+
+See `examples/qwen3_embedding_vllm.py` for complete working examples.
 
 ## Multi-Model Deployment
 

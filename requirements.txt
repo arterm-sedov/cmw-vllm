@@ -1,5 +1,5 @@
 # Core dependencies
-vllm>=0.6.0
+vllm>=0.15.0  # Required for pooling runner (embedding/reranking models)
 flashinfer-python>=0.5.0  # High-performance attention kernels for faster inference
 huggingface-hub>=0.20.0
 pydantic>=2.5.0
