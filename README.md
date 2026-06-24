@@ -409,7 +409,19 @@ VLLM_API_KEY=EMPTY
 
 Then `cmw-rag` will connect to the vLLM server via HTTP (OpenAI-compatible API).
 
-All RAG services run as systemd user services in the cmw-rag repo (`systemd/`): `cmw-rag-chroma.service`, `cmw-rag-mosec.service`, `cmw-rag-app.service`.
+### systemd Service
+
+The `cmw-rag-vllm.service` unit lives in the cmw-rag repo (`systemd/`). Install it like other RAG services:
+
+```bash
+ln -sf /path/to/cmw-rag/systemd/cmw-rag-vllm.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now cmw-rag-vllm
+```
+
+**Port conflict:** ChromaDB occupies port 8000 on the standard deployment. Set `VLLM_PORT=8001` in `.env` before starting the service, and update cmw-rag's `VLLM_BASE_URL` accordingly.
+
+All RAG services run as systemd user services in the cmw-rag repo (`systemd/`): `cmw-rag-chroma.service`, `cmw-rag-mosec.service`, `cmw-rag-app.service`, `cmw-rag-vllm.service`.
 
 ## Testing
 
