@@ -395,6 +395,8 @@ Quick test for guard/moderator model.
 
 ## Integration with cmw-rag
 
+The authoritative single-source-of-truth for the full deployment topology is `docs/deployment/deployment_architecture.md` in the [cmw-rag](https://github.com/cmw-team/cmw-rag) repo.
+
 To use vLLM with `cmw-rag`, configure it as a provider:
 
 ```bash
