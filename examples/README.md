@@ -64,7 +64,7 @@ curl -X POST http://localhost:8100/v1/embeddings \
 | Reranking | Qwen3-Reranker-0.6B | 8101 | ~2GB |
 | Safety Guard | Qwen3Guard-Gen-0.6B | 8105 | ~2GB |
 
-**Note on T5-based models:** FRIDA and other T5-based embedding models require **CLS pooling** which is not supported by vLLM's pooling runner (uses last-token pooling). Use [cmw-mosec](https://github.com/arterm-sedov/cmw-mosec) for T5-based embeddings instead.
+**Note on T5-based models:** FRIDA and other T5-based embedding models require **CLS pooling** which is not supported by vLLM's pooling runner (uses last-token pooling). Use [cmw-mosec](https://github.com/cmw-team/cmw-mosec) for T5-based embeddings instead.
 
 ## Common Mistakes
 

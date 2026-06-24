@@ -12,7 +12,7 @@
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/your-org/cmw-vllm.git
+git clone https://github.com/cmw-team/cmw-vllm.git
 cd cmw-vllm
 ```
 
