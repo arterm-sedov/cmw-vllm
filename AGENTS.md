@@ -64,6 +64,54 @@ Manages vLLM server processes:
 - list: Show available models in registry
 - download <model>: Download model from HuggingFace
 
+## Systemd Service Management
+
+Production services run as systemd user services. **Do NOT start services manually** — this causes port conflicts.
+
+### Services
+
+| Service | Port | Command |
+|---------|------|---------|
+| `cmw-rag-vllm` | 8001 | vLLM inference server (optional) |
+
+### Commands
+
+```bash
+# Status
+systemctl --user status cmw-rag-vllm
+
+# Lifecycle
+systemctl --user start cmw-rag-vllm
+systemctl --user stop cmw-rag-vllm
+systemctl --user restart cmw-rag-vllm
+
+# Logs
+journalctl --user -u cmw-rag-vllm -f
+journalctl --user -u cmw-rag-vllm --no-pager -n 50
+```
+
+### Important
+
+- Service file lives in `cmw-rag/systemd/cmw-rag-vllm.service`, symlinked to `~/.config/systemd/user/`
+- Service auto-restarts on failure and after reboot
+- vLLM is optional — only needed if `DEFAULT_LLM_PROVIDER=vllm` in cmw-rag/.env
+- Port 8000 conflicts with ChromaDB; use `VLLM_PORT=8001` in cmw-vllm/.env
+- **Never run `cmw-vllm start` manually in production** — use `systemctl --user start` instead
+- First-time prerequisite: `loginctl enable-linger $USER` (allows user services at boot)
+
+**Development (manual):**
+
+```bash
+cd cmw-vllm && source .venv/bin/activate
+cmw-vllm start <model>
+```
+
+### Model Registry
+
+Default model: `openai/gpt-oss-20b` (~24GB VRAM). Use `cmw-vllm list` to see all available models.
+
+> Full deployment details: `cmw-rag/docs/deployment/deployment_architecture.md`
+
 ## Dependencies
 
 Core:
